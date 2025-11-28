@@ -1,6 +1,6 @@
 /**
  * Cloudflare Pages Middleware for SPA routing
- * 将所有请求重定向到 index.html，让 React Router 处理路由
+ * 将所有非静态资源请求重定向到 index.html，让 React Router 处理路由
  */
 export async function onRequest(context) {
   const { request, next } = context
@@ -24,47 +24,42 @@ export async function onRequest(context) {
     pathname === '/index.html' ||
     pathname === '/_redirects'
   
-  // 如果是静态文件或 index.html，直接返回
+  // 如果是静态文件，直接返回
   if (isStaticFile) {
     return next()
   }
   
-  // 对于所有非静态文件路径，先尝试获取原始响应
-  const originalResponse = await next()
+  // 对于根路径或非静态文件路径，先尝试获取 index.html
+  // 这样 React Router 可以处理所有路由
+  const indexUrl = new URL(request.url)
+  indexUrl.pathname = '/index.html'
   
-  // 如果响应是 404 或 403，且不是静态文件，返回 index.html
-  if ((originalResponse.status === 404 || originalResponse.status === 403) && !isStaticFile) {
-    // 构建指向 index.html 的请求
-    const indexUrl = new URL(request.url)
-    indexUrl.pathname = '/index.html'
+  const indexRequest = new Request(indexUrl.toString(), {
+    method: 'GET',
+    headers: {
+      'Accept': 'text/html',
+    },
+  })
+  
+  try {
+    const indexResponse = await next(indexRequest)
     
-    // 获取 index.html
-    const indexRequest = new Request(indexUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'text/html',
-      },
-    })
-    
-    try {
-      const indexResponse = await next(indexRequest)
-      
-      // 如果成功获取 index.html，返回它
-      if (indexResponse.ok) {
-        return new Response(indexResponse.body, {
-          status: 200,
-          statusText: 'OK',
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'public, max-age=0, must-revalidate',
-          },
-        })
-      }
-    } catch (error) {
-      console.error('Middleware error:', error)
+    // 如果成功获取 index.html，返回它
+    if (indexResponse.ok) {
+      return new Response(indexResponse.body, {
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'public, max-age=0, must-revalidate',
+        },
+      })
     }
+  } catch (error) {
+    console.error('Middleware error:', error)
   }
   
-  // 如果无法获取 index.html，返回原始响应
+  // 如果无法获取 index.html，尝试返回原始响应
+  const originalResponse = await next()
   return originalResponse
 }
