@@ -171,7 +171,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })()
 
     const defaultWithExtras = defaultAccounts.map(acc => {
-      const remaining = defaultQuotas[acc.id] !== undefined ? defaultQuotas[acc.id] : acc.remainingQuota
+      // 对于管理员账号，如果 localStorage 中没有数据，使用默认值 9999
+      // 对于普通默认账号，如果 localStorage 中没有数据，使用默认值
+      let remaining = defaultQuotas[acc.id] !== undefined ? defaultQuotas[acc.id] : acc.remainingQuota
+      
+      // 如果是管理员账号且没有 localStorage 数据，确保使用默认值 9999
+      if (acc.role === 'admin' && defaultQuotas[acc.id] === undefined) {
+        remaining = 9999
+      }
+      
       const totalUsed = defaultUsedQuotas[acc.id] || 0
       const totalQuota = defaultTotalQuotas[acc.id] !== undefined ? defaultTotalQuotas[acc.id] : acc.remainingQuota
       
@@ -364,6 +372,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 更新最近登录时间
       const now = new Date().toISOString()
+      let finalAccount = account // 用于存储最终的账号数据
+      
       if (account.isDefault) {
         // 更新默认账号的登录时间（持久化到独立的 localStorage 键）
         try {
@@ -371,6 +381,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const loginTimes = stored ? JSON.parse(stored) : {}
           loginTimes[account.id] = now
           localStorage.setItem('default_accounts_login_times', JSON.stringify(loginTimes))
+          
+          // 如果是管理员账号且没有初始化额度数据，初始化默认额度
+          if (account.role === 'admin') {
+            const quotaStored = localStorage.getItem('default_accounts_quota')
+            const quotaData = quotaStored ? JSON.parse(quotaStored) : {}
+            // 如果没有管理员额度数据，初始化默认值 9999
+            if (quotaData[account.id] === undefined) {
+              quotaData[account.id] = 9999
+              localStorage.setItem('default_accounts_quota', JSON.stringify(quotaData))
+              // 更新 finalAccount 使用新的额度值
+              finalAccount = { ...account, remainingQuota: 9999 }
+            }
+            // 初始化累计总额度
+            const totalQuotaStored = localStorage.getItem('default_accounts_total_quota')
+            const totalQuotaData = totalQuotaStored ? JSON.parse(totalQuotaStored) : {}
+            if (totalQuotaData[account.id] === undefined) {
+              totalQuotaData[account.id] = 9999
+              localStorage.setItem('default_accounts_total_quota', JSON.stringify(totalQuotaData))
+            }
+          }
+          
           // 触发 accounts 重新计算
           setDefaultLoginTimesVersion(prev => prev + 1)
         } catch (error) {
@@ -387,14 +418,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
+      // 使用 finalAccount 对象（如果初始化了管理员数据，已包含正确的额度）
       const userData: User = {
-        id: account.id,
-        username: account.username,
-        email: account.email,
-        name: account.name || account.username,
-        role: account.role,
-        createdAt: account.createdAt,
-        remainingQuota: account.remainingQuota,
+        id: finalAccount.id,
+        username: finalAccount.username,
+        email: finalAccount.email,
+        name: finalAccount.name || finalAccount.username,
+        role: finalAccount.role,
+        createdAt: finalAccount.createdAt,
+        remainingQuota: finalAccount.remainingQuota,
       }
       setUser(userData)
       localStorage.setItem('user', JSON.stringify(userData))

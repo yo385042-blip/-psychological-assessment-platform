@@ -123,14 +123,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* 测试账号提示 */}
-          <div className="mt-6 p-4 bg-muted rounded-lg text-sm text-text">
-            <p className="text-sm font-medium text-blue-900 mb-2">测试账号：</p>
-            <div className="text-xs text-blue-800 space-y-1">
-              <p>管理员账号：admin / admin123</p>
-              <p>普通用户：user / user123</p>
-            </div>
-          </div>
         </div>
 
         {/* 辅助链接 */}

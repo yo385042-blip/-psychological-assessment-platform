@@ -2,14 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { Link as LinkIcon, BarChart3, TrendingUp, Activity, RefreshCw, Sparkles, CalendarRange, ArrowRight, Download } from 'lucide-react'
 import StatsCard from '@/components/StatsCard'
-import { mockDashboardStats } from '@/data/mockData'
 import { formatNumber, formatPercentage } from '@/utils/formatters'
 import { useAuth } from '@/contexts/AuthContext'
 import { exportDashboardToPDF } from '@/utils/export'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import ChartWrapper from '@/components/ChartWrapper'
 import { useRealtimeData } from '@/utils/realtime'
-import { getLinkStats } from '@/utils/links'
+import { getLinkStats, loadLinks } from '@/utils/links'
 import {
   LineChart,
   Line,
@@ -54,12 +53,6 @@ const liveMetrics = [
   { label: '平均答题时长', value: 18, target: 20, status: '保持在目标内', unit: 'minutes' as const },
 ]
 
-const questionnaireSummary = [
-  { type: 'SCL-90', participants: 328, completion: 0.86, avgTime: 18 },
-  { type: 'MBTI', participants: 412, completion: 0.91, avgTime: 16 },
-  { type: 'Holland', participants: 276, completion: 0.78, avgTime: 22 },
-]
-
 export default function Dashboard() {
   const { user } = useAuth()
   const [timeframe, setTimeframe] = useState<'7d' | '15d' | '30d'>('7d')
@@ -74,18 +67,73 @@ export default function Dashboard() {
   const { data: realtimeStats } = useRealtimeData(
     'dashboard-stats',
     () => {
+      // 从真实数据计算所有统计信息
+      const links = loadLinks()
       const linkStats = getLinkStats()
+      
+      // 计算今日使用的链接数
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const todayUsedLinks = links.filter((link) => {
+        if (!link.usedAt) return false
+        const usedDate = new Date(link.usedAt)
+        usedDate.setHours(0, 0, 0, 0)
+        return usedDate.getTime() === today.getTime()
+      }).length
+      
+      // 计算参与率（已使用的链接数 / 总链接数）
+      const participationRate = linkStats.total > 0 
+        ? linkStats.used / linkStats.total 
+        : 0
+      
+      // 获取用户的实际剩余额度（管理员显示9999表示无限，普通用户显示实际值）
+      const remainingQuota = user?.role === 'admin' 
+        ? 9999 
+        : (user?.remainingQuota ?? 0)
+      
+      // 返回真实数据，如果没有数据则为 0
       return {
-        ...mockDashboardStats,
         totalLinks: linkStats.total,
-        usedLinks: linkStats.used,
+        remainingQuota: remainingQuota,
+        todayUsedLinks: todayUsedLinks,
         unusedLinks: linkStats.unused,
+        participationRate: participationRate,
       }
     },
     { interval: 30000 }
   )
 
-  const stats = realtimeStats || mockDashboardStats
+  // 使用真实数据，如果没有数据则为默认值（全为0）
+  const stats = realtimeStats || {
+    totalLinks: 0,
+    remainingQuota: user?.role === 'admin' ? 9999 : (user?.remainingQuota ?? 0),
+    todayUsedLinks: 0,
+    unusedLinks: 0,
+    participationRate: 0,
+  }
+
+  // 从真实数据计算问卷使用概览
+  const questionnaireSummary = useMemo(() => {
+    const links = loadLinks()
+    const typeMap: Record<string, { total: number; used: number }> = {}
+    
+    links.forEach(link => {
+      if (!typeMap[link.questionnaireType]) {
+        typeMap[link.questionnaireType] = { total: 0, used: 0 }
+      }
+      typeMap[link.questionnaireType].total++
+      if (link.status === 'used') {
+        typeMap[link.questionnaireType].used++
+      }
+    })
+    
+    return Object.entries(typeMap).map(([type, data]) => ({
+      type,
+      participants: data.total,
+      completion: data.total > 0 ? data.used / data.total : 0,
+      avgTime: 0, // 平均时长暂时设为0，如需要可从报告数据中计算
+    }))
+  }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -255,7 +303,14 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {questionnaireSummary.map((item) => {
+              {questionnaireSummary.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-gray-500">
+                    暂无问卷数据
+                  </td>
+                </tr>
+              ) : (
+                questionnaireSummary.map((item) => {
                 const width = Math.min(item.completion * 100, 100)
                 const colorClass =
                   width >= 85
@@ -281,7 +336,8 @@ export default function Dashboard() {
                     <td className="py-3 text-gray-600">{item.avgTime} 分钟</td>
                   </tr>
                 )
-              })}
+              }))
+              }
             </tbody>
           </table>
         </div>
