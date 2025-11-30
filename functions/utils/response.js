@@ -6,12 +6,12 @@
  * 成功响应
  */
 export function successResponse(data, message = '操作成功') {
-  return Response.json(
-    {
+  return new Response(
+    JSON.stringify({
       success: true,
       data,
       message,
-    },
+    }),
     {
       status: 200,
       headers: {
@@ -25,12 +25,12 @@ export function successResponse(data, message = '操作成功') {
  * 错误响应
  */
 export function errorResponse(message, code = 400, status = 400) {
-  return Response.json(
-    {
+  return new Response(
+    JSON.stringify({
       success: false,
       message,
       code,
-    },
+    }),
     {
       status,
       headers: {
@@ -67,4 +67,5 @@ export function notFoundResponse(message = '资源不存在') {
 export function serverErrorResponse(message = '服务器内部错误') {
   return errorResponse(message, 500, 500)
 }
+
 
