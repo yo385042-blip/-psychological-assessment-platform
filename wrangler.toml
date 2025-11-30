@@ -1,14 +1,1 @@
-# Cloudflare Pages 配置
-# 这个文件用于配置 Cloudflare Workers 和 Pages Functions
-
-name = "psychological-assessment-platform"
-compatibility_date = "2024-01-01"
-pages_build_output_dir = "dist"
-
-# 注意：
-# 1. KV 命名空间绑定已在 Cloudflare Dashboard 中配置
-#    - Production: DB → DB (ID: 7b921b88e1af4955be2236f106a1a628)
-#    - Preview: DB → DB-preview (ID: d8c532c51cc848c9b7bbd4e8f4a43a63)
-# 2. 环境变量 JWT_SECRET 已在 Dashboard 中配置
-# 3. 对于 Cloudflare Pages，KV 绑定主要通过 Dashboard 配置，不需要在 wrangler.toml 中重复配置
 
