@@ -3,7 +3,6 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Link as LinkIcon,
-  ShoppingCart,
   Bell,
   Settings,
   LogOut,
@@ -40,7 +39,6 @@ const navItems: NavItem[] = [
   { path: '/links/generate', icon: LinkIcon, label: '生成链接' },
   { path: '/links/manage', icon: LinkIcon, label: '链接管理' },
   { path: '/statistics', icon: BarChart3, label: '统计分析' },
-  { path: '/packages', icon: ShoppingCart, label: '购买套餐' },
   { path: '/admin/users', icon: Users, label: '用户管理', roles: ['admin'] as Array<'admin' | 'user'> },
   { path: '/notifications', icon: Bell, label: '通知中心' },
   {
@@ -151,7 +149,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
           .map((item) => {
           const Icon = item.icon
           const hasSubItems = item.subItems && item.subItems.length > 0
-          const hasAction = item.action === 'openPayment'
+          const hasAction = item.action === 'openPayment' || item.action === 'openPackages'
           const isExpanded = expandedItems.has(item.label)
 
           // 处理特殊操作（如打开购买套餐页面）
