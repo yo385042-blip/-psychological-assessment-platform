@@ -218,61 +218,123 @@ async function handleAuthRoutes(action, method, request, db, env, userId = null)
  */
 async function handlePaymentRoutes(action, method, request, db, env) {
   // 尝试多种方式读取环境变量（兼容不同的 Cloudflare 环境）
-  const pid = env.ZPAY_PID || env.VITE_ZPAY_PID || process?.env?.ZPAY_PID
-  const key = env.ZPAY_KEY || env.VITE_ZPAY_KEY || process?.env?.ZPAY_KEY
+  const pid = env.ZPAY_PID || env.VITE_ZPAY_PID
+  let key = env.ZPAY_KEY || env.VITE_ZPAY_KEY
+
+  // 获取所有相关环境变量键（用于诊断）
+  const allEnvKeys = Object.keys(env)
+  const relatedKeys = allEnvKeys.filter(k => 
+    k.includes('ZPAY') || k.includes('PAY') || k.includes('KEY') || k.includes('PID')
+  )
 
   // 详细的配置检查和日志
-  console.log('支付配置检查:', {
-    env_keys: Object.keys(env).filter(k => k.includes('ZPAY') || k.includes('PAY')).join(', '),
+  console.log('=== 支付配置深度诊断 ===')
+  console.log('环境变量信息:', {
+    total_env_keys: allEnvKeys.length,
+    related_env_keys: relatedKeys.join(', ') || '未找到相关环境变量',
     pid_exists: !!pid,
     pid_type: typeof pid,
-    pid_value: pid ? pid.substring(0, 4) + '...' : '未设置',
+    pid_value: pid ? (pid.length > 8 ? pid.substring(0, 4) + '...' + pid.substring(pid.length - 4) : pid) : '未设置',
     key_exists: !!key,
     key_type: typeof key,
     key_length: key ? key.length : 0,
-    key_preview: key ? (key.length > 8 ? key.substring(0, 4) + '...' + key.substring(key.length - 4) : key.substring(0, 8)) : '未设置',
-    key_contains_placeholder: key ? (key.includes('商户KEY') || key.includes('你的') || key.includes('your') || key.includes('example')) : false
+    key_preview: key ? (key.length > 8 ? key.substring(0, 6) + '...' + key.substring(key.length - 4) : key.substring(0, 10)) : '未设置',
+    key_is_string: typeof key === 'string'
+  })
+
+  // 检查 KEY 是否为占位符
+  let isPlaceholder = false
+  let detectedPlaceholder = null
+  if (key && typeof key === 'string') {
+    const placeholderPatterns = [
+      { pattern: '商户KEY', name: '商户KEY' },
+      { pattern: '你的', name: '你的' },
+      { pattern: 'your', name: 'your' },
+      { pattern: 'example', name: 'example' },
+      { pattern: 'placeholder', name: 'placeholder' },
+      { pattern: 'test', name: 'test' },
+      { pattern: 'demo', name: 'demo' },
+      { pattern: 'change', name: 'change' }
+    ]
+    
+    for (const { pattern, name } of placeholderPatterns) {
+      if (key.toLowerCase().includes(pattern.toLowerCase())) {
+        isPlaceholder = true
+        detectedPlaceholder = name
+        break
+      }
+    }
+  }
+
+  console.log('KEY 验证详情:', {
+    key_exists: !!key,
+    key_type: typeof key,
+    key_length: key ? key.length : 0,
+    key_trimmed_length: key && typeof key === 'string' ? key.trim().length : 0,
+    is_placeholder: isPlaceholder,
+    detected_placeholder: detectedPlaceholder,
+    key_first_10_chars: key && typeof key === 'string' ? key.substring(0, 10) : 'N/A',
+    key_last_10_chars: key && typeof key === 'string' && key.length > 10 ? key.substring(key.length - 10) : 'N/A',
+    key_full_preview: key && typeof key === 'string' && key.length <= 50 ? key : (key ? key.substring(0, 20) + '...' + key.substring(key.length - 10) : 'N/A')
   })
 
   if (!pid || !key) {
-    console.error('支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置', {
+    console.error('❌ 支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置', {
       pid: !!pid,
       key: !!key,
-      available_env_keys: Object.keys(env).slice(0, 10).join(', ')
-    })
-    return errorResponse('支付配置未完成，请在环境变量中配置 ZPAY_PID 与 ZPAY_KEY。注意：环境变量修改后必须重新部署才能生效！', 500)
-  }
-  
-  // 严格检查 KEY 是否为占位符
-  const placeholderPatterns = ['商户KEY', '你的', 'your', 'example', 'placeholder', 'test', 'demo', 'change']
-  const isPlaceholder = placeholderPatterns.some(pattern => 
-    typeof key === 'string' && key.toLowerCase().includes(pattern.toLowerCase())
-  )
-  
-  if (typeof key !== 'string' || key.trim() === '' || isPlaceholder) {
-    console.error('支付配置错误: ZPAY_KEY 是占位符或无效值', {
-      key_type: typeof key,
-      key_length: key ? key.length : 0,
-      key_preview: key ? key.substring(0, 10) : '未设置',
-      is_placeholder: isPlaceholder,
-      detected_pattern: placeholderPatterns.find(p => key && key.toLowerCase().includes(p.toLowerCase()))
+      available_env_keys: relatedKeys.join(', ') || '无相关环境变量',
+      all_env_key_sample: allEnvKeys.slice(0, 5).join(', ')
     })
     return errorResponse(
-      '支付配置错误：ZPAY_KEY 环境变量的值仍然是占位符（如"商户KEY"），请：\n' +
-      '1. 在 Cloudflare Dashboard → Settings → Variables 中更新 ZPAY_KEY 为易支付后台的真实密钥\n' +
-      '2. 保存后重新部署 Worker（环境变量修改后必须重新部署才能生效）', 
+      '支付配置未完成：ZPAY_PID 或 ZPAY_KEY 环境变量未配置。\n\n' +
+      '请检查：\n' +
+      '1. Cloudflare Dashboard → Settings → Variables 中是否已配置这两个变量\n' +
+      '2. 变量名称拼写是否正确（区分大小写）\n' +
+      '3. 如果已配置，请重新部署 Worker（环境变量修改后必须重新部署才能生效）',
+      500
+    )
+  }
+  
+  if (typeof key !== 'string' || key.trim() === '' || isPlaceholder) {
+    console.error('❌ 支付配置错误: ZPAY_KEY 是占位符或无效值', {
+      key_type: typeof key,
+      key_length: key ? key.length : 0,
+      key_preview: key ? key.substring(0, 20) : '未设置',
+      is_placeholder: isPlaceholder,
+      detected_placeholder: detectedPlaceholder,
+      key_full_value: key && typeof key === 'string' && key.length <= 100 ? key : (key ? key.substring(0, 30) + '...' : 'N/A')
+    })
+    return errorResponse(
+      `支付配置错误：检测到 ZPAY_KEY 环境变量的值仍然是占位符（检测到：${detectedPlaceholder || '未知占位符'}）。\n\n` +
+      `当前 KEY 值预览：${key ? (key.length > 30 ? key.substring(0, 30) + '...' : key) : '未设置'}\n\n` +
+      `请执行以下步骤修复：\n` +
+      `1. 登录 Cloudflare Dashboard → 您的项目 → Settings → Variables\n` +
+      `2. 找到 ZPAY_KEY 变量，检查当前值\n` +
+      `3. 如果值是"商户KEY"等占位符，请更新为易支付后台的真实密钥值\n` +
+      `4. 从易支付后台复制真实密钥：https://zpayz.cn\n` +
+      `5. 粘贴到 ZPAY_KEY 的值中，确保完全一致\n` +
+      `6. 保存环境变量\n` +
+      `7. ⚠️ 重要：重新部署 Worker（在 Deployments 页面点击"重新部署"，或推送代码触发自动部署）\n\n` +
+      `注意：环境变量修改后必须重新部署才能生效！`,
       500
     )
   }
   
   // 检查 KEY 长度（真实的密钥通常是32位或更长）
   if (key.length < 20) {
-    console.error('支付配置错误: ZPAY_KEY 长度太短，可能是无效值', {
+    console.error('❌ 支付配置错误: ZPAY_KEY 长度太短', {
       key_length: key.length,
-      key_preview: key.substring(0, 10)
+      key_preview: key.substring(0, 20),
+      expected_length: '通常为32位或更长'
     })
-    return errorResponse('支付配置错误：商户密钥长度异常，请确认使用的是易支付后台的真实密钥值', 500)
+    return errorResponse(
+      `支付配置错误：商户密钥长度异常（当前：${key.length}位，通常应为32位或更长）。\n\n` +
+      `请确认使用的是易支付后台的真实密钥值，而不是占位符或示例值。`,
+      500
+    )
   }
+  
+  console.log('✅ 支付配置验证通过')
 
   // 创建支付链接：返回签名后的 submit.php URL，由前端重定向
   if (action === 'create' && method === 'POST') {
@@ -295,36 +357,43 @@ async function handlePaymentRoutes(action, method, request, db, env) {
     const baseParams = {}
     
     // 按 ASCII 顺序添加参数（易支付要求参数按字母顺序排序）
-    if (money) baseParams.money = String(money)
-    if (name) baseParams.name = String(name)
-    if (notify_url) baseParams.notify_url = String(notify_url)
-    if (out_trade_no) baseParams.out_trade_no = String(out_trade_no)
-    if (param) baseParams.param = String(param)
-    if (pid) baseParams.pid = String(pid)
-    if (return_url) baseParams.return_url = String(return_url)
-    if (type) baseParams.type = String(type)
-
-    // 验证 KEY 配置（严格检查）
-    console.log('KEY 验证:', {
-      key_exists: !!key,
-      key_type: typeof key,
-      key_length: key ? key.length : 0,
-      key_preview: key ? (key.substring(0, 6) + '...' + key.substring(key.length - 4)) : '未设置',
-      contains_placeholder: key ? key.includes('商户KEY') : false
-    })
+    // 注意：只添加非空值
+    if (money !== undefined && money !== null && money !== '') baseParams.money = String(money)
+    if (name !== undefined && name !== null && name !== '') baseParams.name = String(name)
+    if (notify_url !== undefined && notify_url !== null && notify_url !== '') baseParams.notify_url = String(notify_url)
+    if (out_trade_no !== undefined && out_trade_no !== null && out_trade_no !== '') baseParams.out_trade_no = String(out_trade_no)
+    if (param !== undefined && param !== null && param !== '') baseParams.param = String(param)
+    if (pid !== undefined && pid !== null && pid !== '') baseParams.pid = String(pid)
+    if (return_url !== undefined && return_url !== null && return_url !== '') baseParams.return_url = String(return_url)
+    if (type !== undefined && type !== null && type !== '') baseParams.type = String(type)
     
-    if (!key || typeof key !== 'string' || key.trim() === '') {
-      console.error('支付配置错误: ZPAY_KEY 未配置或为空')
-      return errorResponse('支付配置错误：商户密钥未配置，请在环境变量中设置 ZPAY_KEY', 500)
+    // 记录构建的参数（用于调试）
+    console.log('构建的签名参数:', {
+      param_keys: Object.keys(baseParams).sort().join(', '),
+      param_count: Object.keys(baseParams).length,
+      money: baseParams.money,
+      name: baseParams.name?.substring(0, 30),
+      notify_url: baseParams.notify_url,
+      out_trade_no: baseParams.out_trade_no,
+      param: baseParams.param,
+      pid: baseParams.pid,
+      return_url: baseParams.return_url,
+      type: baseParams.type
+    })
+
+    // 注意：KEY 验证已在函数开头完成，这里不需要重复验证
+    // 但为了安全，再次确认（防止代码路径绕过）
+    if (!key || typeof key !== 'string' || key.trim() === '' || key.includes('商户KEY')) {
+      console.error('❌ 签名前 KEY 验证失败（这不应该发生，说明之前的验证被绕过）')
+      return errorResponse('支付配置错误：商户密钥配置无效，请检查环境变量并重新部署', 500)
     }
     
-    // 检查是否为占位符值
-    const placeholderPatterns = ['商户KEY', '你的', 'your', 'example', 'placeholder', 'test', 'demo']
-    const isPlaceholder = placeholderPatterns.some(pattern => 
+    // 额外检查占位符
+    const placeholderCheck = ['商户KEY', '你的', 'your', 'example'].some(pattern => 
       key.toLowerCase().includes(pattern.toLowerCase())
     )
     
-    if (isPlaceholder) {
+    if (placeholderCheck) {
       console.error('支付配置错误: ZPAY_KEY 是占位符', {
         key_preview: key.substring(0, 10),
         key_length: key.length

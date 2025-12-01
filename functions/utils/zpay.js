@@ -13,7 +13,19 @@ export function buildSignPayload(params) {
     })
 
   // 构建签名字符串，值需要转为字符串（URL 参数应该保持原始值，不需要额外编码）
-  return entries.map(([k, v]) => `${k}=${String(v)}`).join('&')
+  const payload = entries.map(([k, v]) => `${k}=${String(v)}`).join('&')
+  
+  // 调试日志：记录构建的签名字符串
+  console.log('构建签名字符串:', {
+    input_params_count: Object.keys(params).length,
+    filtered_entries_count: entries.length,
+    sorted_keys: entries.map(([k]) => k).join(', '),
+    payload_preview: payload.length > 150 ? payload.substring(0, 100) + '...' + payload.substring(payload.length - 20) : payload,
+    payload_length: payload.length,
+    payload_ends_with: payload.length > 20 ? payload.substring(payload.length - 20) : payload
+  })
+  
+  return payload
 }
 
 // 纯 JS 实现的 MD5，兼容 Cloudflare Workers（不能使用 Node 内置 crypto）
@@ -160,15 +172,36 @@ export function md5Sign(params, key) {
   const payload = buildSignPayload(params)
   const raw = `${payload}${key}`
   
-  // 调试日志（不输出完整密钥）
+  // 详细的签名调试日志
+  console.log('=== 签名生成详情 ===', {
+    params_count: Object.keys(params).length,
+    params_keys: Object.keys(params).sort().join(', '),
+    payload_preview: payload.length > 100 ? payload.substring(0, 100) + '...' : payload,
+    payload_length: payload.length,
+    key_length: key ? key.length : 0,
+    key_preview: key ? (key.length > 10 ? key.substring(0, 6) + '...' + key.substring(key.length - 4) : key) : '未设置',
+    key_ends_with_placeholder: key && typeof key === 'string' ? key.endsWith('商户KEY') : false,
+    raw_length: raw.length,
+    raw_preview: raw.length > 150 ? raw.substring(0, 100) + '...' + raw.substring(raw.length - 20) : raw
+  })
+  
+  // 警告：如果 KEY 是占位符
   if (key && (key.includes('商户KEY') || key.includes('你的'))) {
-    console.warn('警告: 签名使用的 KEY 可能是占位符', {
-      key_preview: key.substring(0, 10),
+    console.error('❌ 警告: 签名使用的 KEY 是占位符！', {
+      key_preview: key.substring(0, 20),
+      key_ends_with: key.substring(Math.max(0, key.length - 10)),
       payload_preview: payload.substring(0, 50) + '...'
     })
   }
   
-  return md5(raw)
+  const sign = md5(raw)
+  
+  console.log('签名结果:', {
+    sign: sign,
+    sign_length: sign.length
+  })
+  
+  return sign
 }
 
 export function verifyMd5Sign(params, key) {
