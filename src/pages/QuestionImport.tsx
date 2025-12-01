@@ -9,7 +9,7 @@ import {
   saveBankQuestions,
 } from '@/utils/questionBank'
 import type { ImportedQuestion, ParseResult } from '@/utils/questionImport'
-import { parseCSV, parseJSON, parseExcel, parseMarkdown, parseXML, formatDate, headerAlias } from '@/utils/questionImport'
+import { parseCSV, parseJSON, parseExcel, parseMarkdown, parseXML, parseHTML, formatDate, headerAlias } from '@/utils/questionImport'
 import { addImportHistory, loadImportHistory, type ImportHistoryRecord } from '@/utils/questionImportHistory'
 import { useQuestionBanks } from '@/hooks/useQuestionBanks'
 import { importLinksFromFile, generateImportTemplate, type ImportResult } from '@/utils/batchImport'
@@ -43,7 +43,7 @@ export default function QuestionImport() {
   // 题目导入相关状态
   const [fileName, setFileName] = useState<string>('')
   const [fileSize, setFileSize] = useState<number>(0)
-  const [fileType, setFileType] = useState<'csv' | 'json' | 'xlsx' | 'xls' | 'txt' | 'md' | 'xml' | 'unknown'>('unknown')
+  const [fileType, setFileType] = useState<'csv' | 'json' | 'xlsx' | 'xls' | 'txt' | 'md' | 'xml' | 'html' | 'unknown'>('unknown')
 
   const [parsing, setParsing] = useState(false)
   const [step, setStep] = useState<ImportStep>('select')
@@ -81,6 +81,7 @@ export default function QuestionImport() {
     const asTxt = lower.endsWith('.txt')
     const asMd = lower.endsWith('.md') || lower.endsWith('.markdown')
     const asXml = lower.endsWith('.xml')
+    const asHtml = lower.endsWith('.html') || lower.endsWith('.htm')
 
     // 设置文件类型
     if (asJSON) setFileType('json')
@@ -89,6 +90,7 @@ export default function QuestionImport() {
     else if (asTxt) setFileType('txt')
     else if (asMd) setFileType('md')
     else if (asXml) setFileType('xml')
+    else if (asHtml) setFileType('html')
     else setFileType('unknown')
 
     setParsing(true)
@@ -121,6 +123,10 @@ export default function QuestionImport() {
           // XML 文件解析
           const text = await file.text()
           return parseXML(text)
+        } else if (asHtml) {
+          // HTML 文件解析
+          const text = await file.text()
+          return parseHTML(text)
         } else {
           // CSV/TXT 文件解析
           const text = await file.text()
@@ -497,7 +503,7 @@ export default function QuestionImport() {
                 <div>
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white">选择题目文件</h2>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    支持多种文件格式：CSV（推荐）、JSON、Excel（.xlsx/.xls）、Markdown（.md）、XML（.xml）、TXT。CSV/Excel 文件第一行为表头，可包含：题目/问题、类型、选项、答案、标签、难度、解析 等列。
+                    支持多种文件格式：CSV（推荐）、JSON、Excel（.xlsx/.xls）、Markdown（.md）、XML（.xml）、HTML（.html/.htm）、TXT。CSV/Excel 文件第一行为表头，可包含：题目/问题、类型、选项、答案、标签、难度、解析 等列。HTML 文件将自动识别题目结构。
                   </p>
                 </div>
               </div>
@@ -508,7 +514,7 @@ export default function QuestionImport() {
                   <span>{parsing ? '解析中...' : '选择文件'}</span>
                   <input
                     type="file"
-                    accept=".csv,.txt,.json,.xlsx,.xls,.md,.markdown,.xml"
+                    accept=".csv,.txt,.json,.xlsx,.xls,.md,.markdown,.xml,.html,.htm"
                     onChange={handleFileChange}
                     className="hidden"
                     disabled={parsing}
@@ -536,6 +542,8 @@ export default function QuestionImport() {
                         ? 'Markdown 解析'
                         : fileType === 'xml'
                         ? 'XML 解析'
+                        : fileType === 'html'
+                        ? 'HTML 解析'
                         : '自动识别 / 默认 CSV 解析'}
                     </div>
                   </div>

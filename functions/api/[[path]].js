@@ -5,7 +5,7 @@
 
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '../utils/response.js'
 import { verifyAuth, requireAdmin, hashPassword, verifyPassword } from '../utils/auth.js'
-import { generateToken } from '../utils/jwt.js'
+import { generateToken, extractToken, verifyToken } from '../utils/jwt.js'
 import { UserDB, LinkDB, QuestionnaireDB, NotificationDB, OrderDB } from '../utils/db.js'
 import { md5Sign, verifyMd5Sign } from '../utils/zpay.js'
 
@@ -100,13 +100,25 @@ export async function onRequest(context) {
 async function routeHandler(pathSegments, method, request, db, env) {
   const [resource, action, ...rest] = pathSegments
 
+  // 添加调试日志（帮助诊断路由问题）
+  console.log('路由调试:', {
+    pathSegments,
+    resource,
+    action,
+    method,
+    url: request.url,
+    rawPath: pathSegments.join('/')
+  })
+
   // 支付相关路由（部分开放）
   if (resource === 'payment') {
+    console.log('进入支付路由处理:', { action, method })
     return handlePaymentRoutes(action, method, request, db, env)
   }
 
   // 认证相关路由（不需要认证）
   if (resource === 'auth') {
+    console.log('进入认证路由处理:', { action, method })
     return handleAuthRoutes(action, method, request, db, env)
   }
 
@@ -167,8 +179,21 @@ async function handleAuthRoutes(action, method, request, db, env, userId = null)
     return handleRegister(request, db)
   }
   
-  if (action === 'me' && method === 'GET' && userId) {
-    return handleGetCurrentUser(userId, db)
+  // /api/auth/me 允许未认证访问（返回未登录状态或用户信息）
+  if (action === 'me' && method === 'GET') {
+    // 尝试从 token 中获取用户信息
+    const token = extractToken(request)
+    
+    if (token) {
+      const payload = verifyToken(token, env)
+      if (payload && payload.userId) {
+        // 有有效的 token，返回用户信息
+        return handleGetCurrentUser(payload.userId, db)
+      }
+    }
+    
+    // 没有 token 或 token 无效，返回未登录状态（但保持成功响应格式）
+    return successResponse(null, '未登录')
   }
   
   if (action === 'logout' && method === 'POST') {
@@ -196,8 +221,12 @@ async function handlePaymentRoutes(action, method, request, db, env) {
   const key = env.ZPAY_KEY
 
   if (!pid || !key) {
+    console.error('支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置')
     return errorResponse('支付配置未完成，请在环境变量中配置 ZPAY_PID 与 ZPAY_KEY', 500)
   }
+
+  // 日志记录配置状态（不输出敏感信息）
+  console.log('支付配置检查: PID已配置, KEY已配置')
 
   // 创建支付链接：返回签名后的 submit.php URL，由前端重定向
   if (action === 'create' && method === 'POST') {

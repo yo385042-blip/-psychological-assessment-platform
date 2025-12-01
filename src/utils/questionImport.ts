@@ -434,6 +434,264 @@ export function parseXML(text: string): ParseResult {
   }
 }
 
+/**
+ * 解析 HTML 文件
+ * - 支持多种 HTML 题目结构
+ * - 自动识别常见的题目容器、选项、答案等元素
+ */
+export function parseHTML(text: string): ParseResult {
+  try {
+    const parser = new DOMParser()
+    const htmlDoc = parser.parseFromString(text, 'text/html')
+    
+    const questions: ImportedQuestion[] = []
+    const warnings: string[] = []
+    
+    // 尝试多种可能的题目容器选择器
+    const questionContainers = htmlDoc.querySelectorAll(
+      '.question, .item, .quiz-item, [data-question], .question-item, ' +
+      '#question, #questions, .questions, .quiz-questions, ' +
+      'div.question, li.question, tr.question'
+    )
+    
+    // 如果没找到特定的题目容器，尝试从表单中提取
+    if (questionContainers.length === 0) {
+      // 尝试查找包含选项的元素（可能是题目）
+      const forms = htmlDoc.querySelectorAll('form')
+      if (forms.length > 0) {
+        // 从表单中提取题目
+        forms.forEach((form) => {
+          const formQuestions: any[] = []
+          
+          // 查找字段集（fieldset）或题目组
+          const fieldsets = form.querySelectorAll('fieldset, .question-group, .question-block')
+          if (fieldsets.length > 0) {
+            fieldsets.forEach((fieldset, index) => {
+              const record: any = {
+                title: '',
+                type: 'single',
+                options: [],
+                answer: '',
+                tags: [],
+              }
+              
+              // 提取题目标题（label、legend、h1-h6、p、span等）
+              const titleSelectors = 'legend, label, h1, h2, h3, h4, h5, h6, p.question-title, .question-title, .title, [data-title]'
+              const titleElement = fieldset.querySelector(titleSelectors)
+              record.title = titleElement?.textContent?.trim() || ''
+              
+              // 提取选项（input[type="radio/checkbox"], label, option等）
+              const inputs = fieldset.querySelectorAll('input[type="radio"], input[type="checkbox"]')
+              if (inputs.length > 0) {
+                inputs.forEach((input) => {
+                  const label = input.closest('label') || 
+                               (input.id ? htmlDoc.querySelector(`label[for="${input.id}"]`) : null) ||
+                               input.nextElementSibling
+                  const optionText = label?.textContent?.trim() || (input as HTMLInputElement).value || ''
+                  if (optionText) {
+                    record.options.push(optionText)
+                  }
+                  // 如果选中，可能是答案
+                  if ((input as HTMLInputElement).checked || input.hasAttribute('checked')) {
+                    record.answer = record.options.length > 0 
+                      ? String.fromCharCode(64 + record.options.length) 
+                      : optionText
+                  }
+                })
+                
+                // 判断题型
+                const hasCheckbox = fieldset.querySelector('input[type="checkbox"]')
+                if (hasCheckbox) {
+                  record.type = 'multiple'
+                }
+              } else {
+                // 尝试从 select 中提取
+                const select = fieldset.querySelector('select')
+                if (select) {
+                  const options = select.querySelectorAll('option')
+                  options.forEach((opt) => {
+                    const text = opt.textContent?.trim()
+                    if (text && !opt.hasAttribute('disabled') && opt.value) {
+                      record.options.push(text)
+                      if (opt.selected || opt.hasAttribute('selected')) {
+                        record.answer = text
+                      }
+                    }
+                  })
+                }
+              }
+              
+              if (record.title) {
+                formQuestions.push(normalizeRecord(record, index))
+              }
+            })
+            
+            questions.push(...formQuestions)
+            return
+          }
+          
+          // 如果没有字段集，尝试从表单中的所有输入元素推断题目结构
+          const allInputs = form.querySelectorAll('input[type="radio"], input[type="checkbox"], textarea, input[type="text"]')
+          if (allInputs.length > 0) {
+            let currentQuestion: any = null
+            
+            Array.from(allInputs).forEach((input) => {
+              const inputElement = input as HTMLElement
+              const parent = inputElement.closest('div, li, tr, fieldset, .question')
+              
+              if (parent) {
+                const titleElement = parent.querySelector('label, .question-title, h1, h2, h3, h4, h5, h6, p, span')
+                const title = titleElement?.textContent?.trim() || ''
+                
+                if (title && (!currentQuestion || currentQuestion.title !== title)) {
+                  // 保存上一题
+                  if (currentQuestion && currentQuestion.title) {
+                    formQuestions.push(normalizeRecord(currentQuestion, formQuestions.length))
+                  }
+                  
+                  // 开始新题
+                  currentQuestion = {
+                    title,
+                    type: inputElement.getAttribute('type') === 'checkbox' ? 'multiple' : 
+                          inputElement.tagName === 'TEXTAREA' ? 'text' : 'single',
+                    options: [],
+                    answer: '',
+                    tags: [],
+                  }
+                }
+                
+                if (currentQuestion) {
+                  const label = inputElement.closest('label') || 
+                               (inputElement.id ? htmlDoc.querySelector(`label[for="${inputElement.id}"]`) : null) ||
+                               inputElement.nextElementSibling
+                  const optionText = label?.textContent?.trim() || (inputElement as HTMLInputElement).value || ''
+                  
+                  if (inputElement.getAttribute('type') === 'radio' || inputElement.getAttribute('type') === 'checkbox') {
+                    if (optionText && !currentQuestion.options.includes(optionText)) {
+                      currentQuestion.options.push(optionText)
+                    }
+                    if ((inputElement as HTMLInputElement).checked || inputElement.hasAttribute('checked')) {
+                      const answerIndex = currentQuestion.options.length - 1
+                      currentQuestion.answer = String.fromCharCode(65 + answerIndex) // A, B, C...
+                    }
+                  } else if (inputElement.tagName === 'TEXTAREA') {
+                    const value = (inputElement as HTMLTextAreaElement).value.trim()
+                    if (value) {
+                      currentQuestion.answer = value
+                    }
+                  }
+                }
+              }
+            })
+            
+            // 保存最后一题
+            if (currentQuestion && currentQuestion.title) {
+              formQuestions.push(normalizeRecord(currentQuestion, formQuestions.length))
+            }
+            
+            questions.push(...formQuestions)
+          }
+        })
+      }
+    } else {
+      // 从找到的题目容器中提取
+      questionContainers.forEach((container, index) => {
+        const record: any = {
+          title: '',
+          type: 'single',
+          options: [],
+          answer: '',
+          tags: [],
+        }
+        
+        // 提取题目标题
+        const titleSelectors = '.question-title, .title, h1, h2, h3, h4, h5, h6, p.title, label, [data-title], .question-text'
+        const titleElement = container.querySelector(titleSelectors)
+        record.title = titleElement?.textContent?.trim() || container.getAttribute('data-question') || ''
+        
+        // 如果还是没有标题，尝试从第一个文本节点获取
+        if (!record.title) {
+          const textNodes = Array.from(container.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+          if (textNodes.length > 0) {
+            record.title = textNodes[0].textContent?.trim() || ''
+          }
+        }
+        
+        // 提取选项
+        const optionSelectors = '.option, .choice, input[type="radio"], input[type="checkbox"], label, .answer-option'
+        const optionElements = container.querySelectorAll(optionSelectors)
+        
+        if (optionElements.length > 0) {
+          optionElements.forEach((elem) => {
+            const optionText = elem.textContent?.trim() || (elem as HTMLInputElement).value || ''
+            if (optionText && !record.options.includes(optionText)) {
+              record.options.push(optionText)
+              
+              // 检查是否选中（答案）
+              const input = elem as HTMLInputElement
+              if (input.checked || input.hasAttribute('checked') || 
+                  elem.classList.contains('correct') || elem.classList.contains('answer') ||
+                  elem.hasAttribute('data-correct')) {
+                const answerChar = String.fromCharCode(65 + record.options.length - 1)
+                if (!record.answer) {
+                  record.answer = answerChar
+                } else {
+                  record.answer += ',' + answerChar
+                  record.type = 'multiple'
+                }
+              }
+            }
+          })
+        }
+        
+        // 判断题型
+        const hasCheckbox = container.querySelector('input[type="checkbox"]')
+        if (hasCheckbox && record.options.length > 0) {
+          record.type = 'multiple'
+        }
+        
+        // 提取答案（可能有单独的答案区域）
+        const answerSelectors = '.answer, .correct-answer, .solution, [data-answer], .answer-text'
+        const answerElement = container.querySelector(answerSelectors)
+        if (answerElement && !record.answer) {
+          record.answer = answerElement.textContent?.trim() || ''
+        }
+        
+        // 提取解析
+        const analysisSelectors = '.analysis, .explanation, .solution-text, [data-analysis]'
+        const analysisElement = container.querySelector(analysisSelectors)
+        if (analysisElement) {
+          record.analysis = analysisElement.textContent?.trim() || ''
+        }
+        
+        // 提取标签
+        const tagSelectors = '.tag, .category, [data-tag], .question-tag'
+        const tagElements = container.querySelectorAll(tagSelectors)
+        record.tags = Array.from(tagElements).map(tag => tag.textContent?.trim() || '').filter(Boolean)
+        
+        const normalized = normalizeRecord(record, index)
+        if (!normalized.title) {
+          warnings.push(`第 ${index + 1} 个题目容器缺少题目标题，已跳过`)
+          return
+        }
+        questions.push(normalized)
+      })
+    }
+    
+    if (questions.length === 0) {
+      warnings.push('未能从 HTML 文件中解析出题目，请检查 HTML 结构。支持的结构：包含 .question、form、fieldset 等元素的HTML')
+    }
+    
+    return { questions, warnings }
+  } catch (error) {
+    return {
+      questions: [],
+      warnings: [`HTML 解析失败: ${error instanceof Error ? error.message : '未知错误'}`],
+    }
+  }
+}
+
 
 
 

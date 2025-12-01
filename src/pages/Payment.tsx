@@ -105,12 +105,22 @@ export default function Payment() {
       })
 
       if (!resp.ok) {
-        throw new Error('创建支付订单失败')
+        const errorText = await resp.text()
+        console.error('支付创建失败:', resp.status, errorText)
+        throw new Error(`创建支付订单失败 (${resp.status}): ${errorText}`)
       }
 
       const data = await resp.json()
-      if (data.code !== 0 || !data.data?.payUrl) {
-        throw new Error(data.message || '支付网关返回异常')
+      console.log('支付接口返回:', data)
+      
+      if (data.code !== 0) {
+        console.error('支付接口错误:', data)
+        throw new Error(data.message || `支付配置错误 (code: ${data.code})`)
+      }
+      
+      if (!data.data?.payUrl) {
+        console.error('支付接口返回数据异常:', data)
+        throw new Error(data.message || '支付网关返回异常：缺少支付链接')
       }
 
       // 跳转到易支付收银台
