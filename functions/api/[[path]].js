@@ -217,16 +217,62 @@ async function handleAuthRoutes(action, method, request, db, env, userId = null)
  * - /api/payment/notify  易支付异步通知回调
  */
 async function handlePaymentRoutes(action, method, request, db, env) {
-  const pid = env.ZPAY_PID
-  const key = env.ZPAY_KEY
+  // 尝试多种方式读取环境变量（兼容不同的 Cloudflare 环境）
+  const pid = env.ZPAY_PID || env.VITE_ZPAY_PID || process?.env?.ZPAY_PID
+  const key = env.ZPAY_KEY || env.VITE_ZPAY_KEY || process?.env?.ZPAY_KEY
+
+  // 详细的配置检查和日志
+  console.log('支付配置检查:', {
+    env_keys: Object.keys(env).filter(k => k.includes('ZPAY') || k.includes('PAY')).join(', '),
+    pid_exists: !!pid,
+    pid_type: typeof pid,
+    pid_value: pid ? pid.substring(0, 4) + '...' : '未设置',
+    key_exists: !!key,
+    key_type: typeof key,
+    key_length: key ? key.length : 0,
+    key_preview: key ? (key.length > 8 ? key.substring(0, 4) + '...' + key.substring(key.length - 4) : key.substring(0, 8)) : '未设置',
+    key_contains_placeholder: key ? (key.includes('商户KEY') || key.includes('你的') || key.includes('your') || key.includes('example')) : false
+  })
 
   if (!pid || !key) {
-    console.error('支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置')
-    return errorResponse('支付配置未完成，请在环境变量中配置 ZPAY_PID 与 ZPAY_KEY', 500)
+    console.error('支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置', {
+      pid: !!pid,
+      key: !!key,
+      available_env_keys: Object.keys(env).slice(0, 10).join(', ')
+    })
+    return errorResponse('支付配置未完成，请在环境变量中配置 ZPAY_PID 与 ZPAY_KEY。注意：环境变量修改后必须重新部署才能生效！', 500)
   }
-
-  // 日志记录配置状态（不输出敏感信息）
-  console.log('支付配置检查: PID已配置, KEY已配置')
+  
+  // 严格检查 KEY 是否为占位符
+  const placeholderPatterns = ['商户KEY', '你的', 'your', 'example', 'placeholder', 'test', 'demo', 'change']
+  const isPlaceholder = placeholderPatterns.some(pattern => 
+    typeof key === 'string' && key.toLowerCase().includes(pattern.toLowerCase())
+  )
+  
+  if (typeof key !== 'string' || key.trim() === '' || isPlaceholder) {
+    console.error('支付配置错误: ZPAY_KEY 是占位符或无效值', {
+      key_type: typeof key,
+      key_length: key ? key.length : 0,
+      key_preview: key ? key.substring(0, 10) : '未设置',
+      is_placeholder: isPlaceholder,
+      detected_pattern: placeholderPatterns.find(p => key && key.toLowerCase().includes(p.toLowerCase()))
+    })
+    return errorResponse(
+      '支付配置错误：ZPAY_KEY 环境变量的值仍然是占位符（如"商户KEY"），请：\n' +
+      '1. 在 Cloudflare Dashboard → Settings → Variables 中更新 ZPAY_KEY 为易支付后台的真实密钥\n' +
+      '2. 保存后重新部署 Worker（环境变量修改后必须重新部署才能生效）', 
+      500
+    )
+  }
+  
+  // 检查 KEY 长度（真实的密钥通常是32位或更长）
+  if (key.length < 20) {
+    console.error('支付配置错误: ZPAY_KEY 长度太短，可能是无效值', {
+      key_length: key.length,
+      key_preview: key.substring(0, 10)
+    })
+    return errorResponse('支付配置错误：商户密钥长度异常，请确认使用的是易支付后台的真实密钥值', 500)
+  }
 
   // 创建支付链接：返回签名后的 submit.php URL，由前端重定向
   if (action === 'create' && method === 'POST') {
@@ -258,10 +304,39 @@ async function handlePaymentRoutes(action, method, request, db, env) {
     if (return_url) baseParams.return_url = String(return_url)
     if (type) baseParams.type = String(type)
 
-    // 验证 KEY 配置
-    if (!key || key.trim() === '' || key.includes('商户KEY') || key.includes('你的')) {
-      console.error('支付配置错误: ZPAY_KEY 配置无效，当前值为:', key ? key.substring(0, 10) + '...' : '未设置')
-      return errorResponse('支付配置错误：商户密钥未正确配置，请检查环境变量 ZPAY_KEY 是否为实际密钥值', 500)
+    // 验证 KEY 配置（严格检查）
+    console.log('KEY 验证:', {
+      key_exists: !!key,
+      key_type: typeof key,
+      key_length: key ? key.length : 0,
+      key_preview: key ? (key.substring(0, 6) + '...' + key.substring(key.length - 4)) : '未设置',
+      contains_placeholder: key ? key.includes('商户KEY') : false
+    })
+    
+    if (!key || typeof key !== 'string' || key.trim() === '') {
+      console.error('支付配置错误: ZPAY_KEY 未配置或为空')
+      return errorResponse('支付配置错误：商户密钥未配置，请在环境变量中设置 ZPAY_KEY', 500)
+    }
+    
+    // 检查是否为占位符值
+    const placeholderPatterns = ['商户KEY', '你的', 'your', 'example', 'placeholder', 'test', 'demo']
+    const isPlaceholder = placeholderPatterns.some(pattern => 
+      key.toLowerCase().includes(pattern.toLowerCase())
+    )
+    
+    if (isPlaceholder) {
+      console.error('支付配置错误: ZPAY_KEY 是占位符', {
+        key_preview: key.substring(0, 10),
+        key_length: key.length
+      })
+      return errorResponse('支付配置错误：ZPAY_KEY 环境变量值仍然是占位符（如"商户KEY"），请更新为易支付后台的真实密钥值，并重新部署Worker', 500)
+    }
+    
+    if (key.length < 10) {
+      console.error('支付配置错误: ZPAY_KEY 长度太短，可能是无效值', {
+        key_length: key.length
+      })
+      return errorResponse('支付配置错误：商户密钥长度无效，请使用易支付后台的真实密钥值', 500)
     }
 
     // 创建本地订单（pending）

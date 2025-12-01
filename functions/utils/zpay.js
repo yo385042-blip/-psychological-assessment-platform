@@ -1,10 +1,19 @@
 // 构造 MD5 签名用的明文字符串（按文档要求：按参数名 ASCII 排序，去掉 sign/sign_type 和空值）
 export function buildSignPayload(params) {
   const entries = Object.entries(params)
-    .filter(([key, value]) => key !== 'sign' && key !== 'sign_type' && value !== undefined && value !== null && value !== '')
-    .sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0))
+    .filter(([key, value]) => {
+      // 排除 sign、sign_type 和空值
+      if (key === 'sign' || key === 'sign_type') return false
+      if (value === undefined || value === null || value === '') return false
+      return true
+    })
+    .sort(([a], [b]) => {
+      // 按 ASCII 顺序排序（字符串比较）
+      return a.localeCompare(b)
+    })
 
-  return entries.map(([k, v]) => `${k}=${v}`).join('&')
+  // 构建签名字符串，值需要转为字符串（URL 参数应该保持原始值，不需要额外编码）
+  return entries.map(([k, v]) => `${k}=${String(v)}`).join('&')
 }
 
 // 纯 JS 实现的 MD5，兼容 Cloudflare Workers（不能使用 Node 内置 crypto）
@@ -150,6 +159,15 @@ function md5(raw) {
 export function md5Sign(params, key) {
   const payload = buildSignPayload(params)
   const raw = `${payload}${key}`
+  
+  // 调试日志（不输出完整密钥）
+  if (key && (key.includes('商户KEY') || key.includes('你的'))) {
+    console.warn('警告: 签名使用的 KEY 可能是占位符', {
+      key_preview: key.substring(0, 10),
+      payload_preview: payload.substring(0, 50) + '...'
+    })
+  }
+  
   return md5(raw)
 }
 
