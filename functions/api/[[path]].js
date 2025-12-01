@@ -327,7 +327,25 @@ async function handleLogin(request, db, env) {
     return errorResponse('用户名和密码不能为空', 400)
   }
 
-  const user = await db.users.getUserByUsername(username)
+  let user = await db.users.getUserByUsername(username)
+
+  // 如果还没有任何用户，并且使用默认管理员账号登录，则自动创建一个管理员账号
+  // 方便首次部署后直接使用：admin / admin123
+  if (!user) {
+    const allUsers = await db.users.getAllUsers()
+    if (allUsers.length === 0 && username === 'admin' && password === 'admin123') {
+      user = await db.users.createUser({
+        username: 'admin',
+        email: 'admin@example.com',
+        password: hashPassword('admin123'),
+        name: '管理员',
+        role: 'admin',
+        status: 'active',
+        remainingQuota: 9999,
+      })
+    }
+  }
+
   if (!user) {
     return errorResponse('用户名或密码错误', 401)
   }
