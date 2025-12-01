@@ -44,6 +44,8 @@ export default function Payment() {
   // 支付完成后从 return_url 返回时，根据订单状态跳转到测试页面
   useEffect(() => {
     const checkOrder = async () => {
+      // 支持新的 qt 参数和旧的 type 参数（向后兼容）
+      const questionnaireType = searchParams.get('qt') || searchParams.get('type') || ''
       if (result !== 'return' || !orderNo) return
       try {
         const resp = await fetch(`/api/payment/order-status?out_trade_no=${encodeURIComponent(orderNo)}`)
@@ -84,7 +86,8 @@ export default function Payment() {
 
       const baseUrl = window.location.origin
       const notifyUrl = `${baseUrl}/api/payment/notify`
-      const returnUrl = `${baseUrl}/payment?result=return&type=${encodeURIComponent(
+      // 注意：return_url 中使用 qt 而不是 type，避免与支付参数 type 冲突
+      const returnUrl = `${baseUrl}/payment?result=return&qt=${encodeURIComponent(
         questionnaire.value,
       )}&order=${outTradeNo}`
 
