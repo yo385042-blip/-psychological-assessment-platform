@@ -1,27 +1,40 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense } from 'react'
+import { Suspense, lazy } from 'react'
 import MainLayout from './components/Layout/MainLayout'
 import ProtectedRoute from './components/ProtectedRoute'
+import RouteBoundary from './components/RouteBoundary'
 import { useAuth } from './contexts/AuthContext'
-import QuestionManagePage from './pages/QuestionManagePage'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
-import LinksGenerate from './pages/LinksGenerate'
-import LinksManage from './pages/LinksManage'
-import Packages from './pages/Packages'
-import Notifications from './pages/Notifications'
-import Profile from './pages/Profile'
-import UserManagement from './pages/UserManagement'
-import UserDetail from './pages/UserDetail'
-import QuestionImport from './pages/QuestionImport'
-import ReportDetail from './pages/ReportDetail'
-import Reports from './pages/Reports'
-import ExportHistory from './pages/ExportHistory'
-import AuditLogs from './pages/AuditLogs'
-import BackupManage from './pages/BackupManage'
-import Statistics from './pages/Statistics'
-import BatchImportLinks from './pages/BatchImportLinks'
+
+const Home = lazy(() => import('./pages/Home'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Payment = lazy(() => import('./pages/Payment'))
+const Test = lazy(() => import('./pages/Test'))
+const UserAgreement = lazy(() => import('./pages/UserAgreement'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const LinksGenerate = lazy(() => import('./pages/LinksGenerate'))
+const LinksManage = lazy(() => import('./pages/LinksManage'))
+const BatchImportLinks = lazy(() => import('./pages/BatchImportLinks'))
+const Packages = lazy(() => import('./pages/Packages'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Feedback = lazy(() => import('./pages/Feedback'))
+const Invite = lazy(() => import('./pages/Invite'))
+const ReportDetail = lazy(() => import('./pages/ReportDetail'))
+const Reports = lazy(() => import('./pages/Reports'))
+const ExportHistory = lazy(() => import('./pages/ExportHistory'))
+const Statistics = lazy(() => import('./pages/Statistics'))
+const Manager = lazy(() => import('./pages/Manager'))
+const UserManagement = lazy(() => import('./pages/UserManagement'))
+const UserDetail = lazy(() => import('./pages/UserDetail'))
+const QuestionImport = lazy(() => import('./pages/QuestionImport'))
+const QuestionManagePage = lazy(() => import('./pages/QuestionManagePage'))
+const QuestionnaireManage = lazy(() => import('./pages/QuestionnaireManage'))
+const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const BackupManage = lazy(() => import('./pages/BackupManage'))
 
 // 页面加载组件
 function PageLoader() {
@@ -41,13 +54,16 @@ export default function App() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        {/* 首页 */}
+        <Route 
+          path="/" 
+          element={<Home />} 
+        />
         <Route 
           path="/login" 
           element={
             isAuthenticated ? <Navigate to="/dashboard" replace /> : (
-              <Suspense fallback={<PageLoader />}>
-                <Login />
-              </Suspense>
+              <Login />
             )
           } 
         />
@@ -55,169 +71,132 @@ export default function App() {
           path="/register" 
           element={
             isAuthenticated ? <Navigate to="/dashboard" replace /> : (
-              <Suspense fallback={<PageLoader />}>
-                <Register />
-              </Suspense>
+              <Register />
             )
           } 
         />
+        <Route 
+          path="/payment" 
+          element={<Payment />} 
+        />
+        <Route 
+          path="/test/:linkId" 
+          element={<Test />} 
+        />
+        <Route 
+          path="/user-agreement" 
+          element={<UserAgreement />} 
+        />
+        <Route 
+          path="/privacy-policy" 
+          element={<PrivacyPolicy />} 
+        />
         <Route
-          path="/"
+          path="/*"
           element={
             <ProtectedRoute>
               <MainLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route 
             path="dashboard" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Dashboard />
-              </Suspense>
-            } 
+            element={<Dashboard />} 
           />
           <Route 
             path="links/generate" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <LinksGenerate />
-              </Suspense>
-            } 
+            element={<LinksGenerate />} 
           />
           <Route 
             path="links/manage" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <LinksManage />
-              </Suspense>
-            } 
+            element={<LinksManage />} 
           />
           <Route 
             path="links/batch-import" 
             element={
-              <Suspense fallback={<PageLoader />}>
+              <RouteBoundary title="批量导入链接">
                 <BatchImportLinks />
-              </Suspense>
+              </RouteBoundary>
             } 
           />
           <Route 
             path="packages" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Packages />
-              </Suspense>
-            } 
+            element={<Packages />} 
           />
           <Route 
             path="notifications" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Notifications />
-              </Suspense>
-            } 
+            element={<Notifications />} 
           />
           <Route 
             path="profile" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Profile />
-              </Suspense>
-            } 
+            element={<Profile />} 
           />
           <Route 
             path="settings" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Profile />
-              </Suspense>
-            } 
+            element={<Settings />} 
+          />
+          <Route 
+            path="feedback" 
+            element={<Feedback />} 
+          />
+          <Route 
+            path="invite" 
+            element={<Invite />} 
           />
           <Route 
             path="reports/:id" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <ReportDetail />
-              </Suspense>
-            } 
+            element={<ReportDetail />} 
           />
           <Route 
             path="admin/reports" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Reports />
-              </Suspense>
-            } 
+            element={<Reports />} 
           />
           <Route 
             path="admin/export-history" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <ExportHistory />
-              </Suspense>
-            } 
+            element={<ExportHistory />} 
           />
           <Route 
             path="statistics" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <Statistics />
-              </Suspense>
-            } 
+            element={<Statistics />} 
+          />
+          <Route 
+            path="manager" 
+            element={<Manager />} 
           />
           <Route 
             path="admin/users" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <UserManagement />
-              </Suspense>
-            } 
+            element={<UserManagement />} 
           />
           <Route 
             path="admin/users/:userId" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <UserDetail />
-              </Suspense>
-            } 
-          />
-          <Route 
-            path="admin/users/:id" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <UserDetail />
-              </Suspense>
-            } 
+            element={<UserDetail />} 
           />
           <Route 
             path="admin/questions/import" 
             element={
-              <Suspense fallback={<PageLoader />}>
+              <RouteBoundary title="题库导入">
                 <QuestionImport />
-              </Suspense>
+              </RouteBoundary>
             } 
           />
           <Route 
             path="admin/questions/manage" 
-            element={
-              <QuestionManagePage />
-            } 
+            element={<QuestionManagePage />} 
+          />
+          <Route 
+            path="admin/questionnaires/manage" 
+            element={<QuestionnaireManage />} 
           />
           <Route 
             path="admin/audit" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <AuditLogs />
-              </Suspense>
-            } 
+            element={<AuditLogs />} 
           />
           <Route 
             path="admin/backup" 
             element={
-              <Suspense fallback={<PageLoader />}>
+              <RouteBoundary title="备份管理">
                 <BackupManage />
-              </Suspense>
+              </RouteBoundary>
             } 
           />
         </Route>

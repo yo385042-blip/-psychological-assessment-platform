@@ -442,22 +442,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async ({ username, email, password }: RegisterPayload): Promise<RegisterResult> => {
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    const exists = [...defaultAccounts, ...customUsers].some(
+    // 检查用户名是否已存在（不区分大小写）
+    const usernameExists = [...defaultAccounts, ...customUsers].some(
       (account) => account.username.toLowerCase() === username.toLowerCase(),
     )
-    if (exists) {
+    if (usernameExists) {
       return { success: false, message: '用户名已存在，请更换后重试' }
+    }
+
+    // 检查邮箱是否已存在（不区分大小写）
+    const emailExists = [...defaultAccounts, ...customUsers].some(
+      (account) => account.email.toLowerCase() === email.toLowerCase(),
+    )
+    if (emailExists) {
+      return { success: false, message: '邮箱已被注册，请使用其他邮箱' }
     }
 
     const newUser: StoredAccount = {
       id: Date.now().toString(),
-      username,
-      email,
-      password,
+      username: username.trim(),
+      email: email.trim(),
+      password, // 注意：实际应用中应使用哈希密码，这里仅用于演示
       role: 'user',
-      name: username,
+      name: username.trim(),
       createdAt: new Date().toISOString(),
-      status: 'disabled',
+      status: 'disabled', // 新注册用户默认为禁用状态，需要管理员审核
       remainingQuota: 0,
     }
 

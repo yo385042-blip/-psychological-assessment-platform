@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { User, Mail, Calendar, Save, Edit2, Camera } from 'lucide-react'
+import { User, Mail, Calendar, Edit2, Camera, Save } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDate } from '@/utils/formatters'
 
@@ -10,13 +10,6 @@ export default function Profile() {
     name: user?.name || '',
     email: user?.email || '',
   })
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  })
-  const [passwordError, setPasswordError] = useState('')
 
   if (!user) return null
 
@@ -26,35 +19,11 @@ export default function Profile() {
     setIsEditing(false)
   }
 
-  const handlePasswordSave = () => {
-    setPasswordError('')
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      setPasswordError('请填写完整信息')
-      return
-    }
-    if (passwordForm.newPassword.length < 8) {
-      setPasswordError('新密码至少8位')
-      return
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('两次输入的新密码不一致')
-      return
-    }
-    // 这里应该调用API修改密码
-    alert('密码已更新')
-    setIsChangingPassword(false)
-    setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    })
-  }
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">个人资料</h1>
-        <p className="text-gray-600 mt-2">管理您的账户信息和偏好设置</p>
+        <p className="text-gray-600 mt-2">管理您的账户信息</p>
       </div>
 
       {/* 基本信息卡片 */}
@@ -180,84 +149,15 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* 账户安全 */}
       <div className="card">
-        <h2 className="text-xl font-semibold mb-4">账户安全</h2>
-        <div className="space-y-4">
-          <div className="p-4 border border-muted rounded-lg space-y-4">
-            <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium text-gray-900">修改密码</h3>
-              <p className="text-sm text-gray-500 mt-1">定期更改密码以保护账户安全</p>
-            </div>
-              {!isChangingPassword && (
-                <button className="btn-secondary" onClick={() => setIsChangingPassword(true)}>
-                  修改
-                </button>
-              )}
-            </div>
-            {isChangingPassword && (
-              <div className="space-y-3">
-                {passwordError && (
-                  <div className="text-sm text-danger bg-dangerLight/60 border border-dangerLight text-left px-3 py-2 rounded-lg">
-                    {passwordError}
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input
-                    type="password"
-                    placeholder="当前密码"
-                    value={passwordForm.currentPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    className="input"
-                  />
-                  <input
-                    type="password"
-                    placeholder="新密码（至少8位）"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="input"
-                  />
-                  <input
-                    type="password"
-                    placeholder="确认新密码"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                    className="input"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={handlePasswordSave} className="btn-primary flex items-center gap-2">
-                    <Save className="w-4 h-4" />
-                    保存密码
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsChangingPassword(false)
-                      setPasswordError('')
-                      setPasswordForm({
-                        currentPassword: '',
-                        newPassword: '',
-                        confirmPassword: '',
-                      })
-                    }}
-                    className="btn-secondary"
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            )}
+        <div className="flex items-center justify-between p-4 border border-muted rounded-lg">
+          <div>
+            <h3 className="font-medium text-gray-900">账户设置</h3>
+            <p className="text-sm text-gray-500 mt-1">安全设置与通知偏好已移动至“设置”页面</p>
           </div>
-          <div className="flex items-center justify-between p-4 border border-muted rounded-lg">
-            <div>
-              <h3 className="font-medium text-gray-900">退出登录</h3>
-              <p className="text-sm text-gray-500 mt-1">安全退出当前账户</p>
-            </div>
-            <button onClick={logout} className="btn-secondary">
-              退出
-            </button>
-          </div>
+          <button onClick={logout} className="btn-secondary">
+            退出登录
+          </button>
         </div>
       </div>
     </div>

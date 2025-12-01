@@ -212,6 +212,17 @@ export default function QuestionManagePage() {
     }
 
     loadQuestions()
+    
+    // 监听题目更新事件
+    const handleQuestionsUpdate = () => {
+      loadQuestions()
+    }
+    
+    window.addEventListener('questions-updated', handleQuestionsUpdate)
+    
+    return () => {
+      window.removeEventListener('questions-updated', handleQuestionsUpdate)
+    }
   }, [loadQuestions, hasCheckedMigration])
 
   const toggleQuestionStatus = useCallback(

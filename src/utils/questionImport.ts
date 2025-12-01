@@ -153,19 +153,283 @@ export function parseCSV(text: string, alias: Record<string, string> = headerAli
 
 /**
  * 解析 JSON 文本
- * - 期望为数组或包含 questions 字段的对象
+ * - 支持多种格式：
+ *   1. 数组格式：[{title: "...", options: [...], ...}, ...]
+ *   2. 对象格式：{questions: [{...}, ...]}
+ *   3. 对象格式：{data: [{...}, ...]}
+ *   4. 对象格式：{items: [{...}, ...]}
  */
 export function parseJSON(text: string): ParseResult {
   try {
     const data = JSON.parse(text)
-    const list = Array.isArray(data) ? data : Array.isArray(data?.questions) ? data.questions : []
+    let list: any[] = []
+    const warnings: string[] = []
 
-    const questions = list.map((item: any, index: number) => normalizeRecord(item, index))
-    return { questions, warnings: [] }
+    // 处理不同的JSON结构
+    if (Array.isArray(data)) {
+      // 直接是数组
+      list = data
+    } else if (typeof data === 'object' && data !== null) {
+      // 对象格式，尝试多个可能的字段名
+      list = 
+        data.questions || 
+        data.data || 
+        data.items || 
+        data.list || 
+        data.题目 || 
+        data.问题 ||
+        []
+      
+      if (!Array.isArray(list)) {
+        warnings.push('JSON 结构不符合预期，未找到题目数组')
+        return { questions: [], warnings }
+      }
+    } else {
+      warnings.push('JSON 格式不正确，期望数组或包含题目数组的对象')
+      return { questions: [], warnings }
+    }
+
+    if (list.length === 0) {
+      warnings.push('JSON 文件中没有找到题目数据')
+      return { questions: [], warnings }
+    }
+
+    const questions = list.map((item: any, index: number) => {
+      try {
+        return normalizeRecord(item, index)
+      } catch (error) {
+        warnings.push(`第 ${index + 1} 条记录解析失败: ${error instanceof Error ? error.message : '未知错误'}`)
+        return null
+      }
+    }).filter((q): q is ImportedQuestion => q !== null)
+
+    return { questions, warnings }
   } catch (error) {
     return {
       questions: [],
-      warnings: ['JSON 解析失败，请检查文件格式是否正确'],
+      warnings: [`JSON 解析失败: ${error instanceof Error ? error.message : '请检查文件格式是否正确'}`],
+    }
+  }
+}
+
+/**
+ * 解析 Excel 文件（.xlsx, .xls）
+ * - 使用 xlsx 库解析
+ * - 读取第一个工作表
+ * - 第一行为表头
+ */
+export async function parseExcel(file: File, alias: Record<string, string> = headerAlias): Promise<ParseResult> {
+  try {
+    // 动态导入 xlsx 库
+    const XLSX = await import('xlsx')
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const firstSheetName = workbook.SheetNames[0]
+          const firstSheet = workbook.Sheets[firstSheetName]
+          
+          // 转换为 JSON 数组
+          const jsonData: any[] = XLSX.utils.sheet_to_json(firstSheet, { defval: '' })
+          
+          if (jsonData.length === 0) {
+            resolve({ questions: [], warnings: ['Excel 文件中没有数据'] })
+            return
+          }
+          
+          // 获取表头（从第一行数据推断）
+          const headers = Object.keys(jsonData[0])
+          const mappedKeys = headers.map((h) => alias[h] || h)
+          
+          const warnings: string[] = []
+          const questions: ImportedQuestion[] = []
+          
+          jsonData.forEach((row, index) => {
+            const record: any = {}
+            mappedKeys.forEach((key, idx) => {
+              record[key] = row[headers[idx]] ?? ''
+            })
+            
+            const normalized = normalizeRecord(record, index)
+            if (!normalized.title) {
+              warnings.push(`第 ${index + 2} 行缺少题目标题，已跳过`)
+              return
+            }
+            questions.push(normalized)
+          })
+          
+          resolve({ questions, warnings })
+        } catch (error) {
+          resolve({
+            questions: [],
+            warnings: [`Excel 解析失败: ${error instanceof Error ? error.message : '未知错误'}`],
+          })
+        }
+      }
+      
+      reader.onerror = () => {
+        resolve({
+          questions: [],
+          warnings: ['读取 Excel 文件失败'],
+        })
+      }
+      
+      reader.readAsArrayBuffer(file)
+    })
+  } catch (error) {
+    return {
+      questions: [],
+      warnings: [`Excel 解析库加载失败: ${error instanceof Error ? error.message : '未知错误'}`],
+    }
+  }
+}
+
+/**
+ * 解析 Markdown 文件
+ * - 支持简单的 Markdown 格式题目
+ * - 格式：## 题目标题\n选项A\n选项B\n答案：A
+ */
+export function parseMarkdown(text: string): ParseResult {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim())
+  if (lines.length === 0) {
+    return { questions: [], warnings: ['文件内容为空'] }
+  }
+  
+  const questions: ImportedQuestion[] = []
+  const warnings: string[] = []
+  let currentQuestion: any = null
+  let questionIndex = 0
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    
+    // 检测题目标题（## 或 ### 开头，或数字编号）
+    if (line.startsWith('##') || line.startsWith('###') || /^\d+[\.、]/.test(line)) {
+      // 保存上一题
+      if (currentQuestion && currentQuestion.title) {
+        questions.push(normalizeRecord(currentQuestion, questionIndex++))
+      }
+      
+      // 开始新题
+      const title = line.replace(/^#+\s*/, '').replace(/^\d+[\.、]\s*/, '').trim()
+      currentQuestion = {
+        title,
+        type: 'single',
+        options: [],
+        answer: '',
+        tags: [],
+      }
+    } else if (currentQuestion) {
+      // 检测选项（以 - 或 * 开头，或 A. B. 等格式）
+      if (/^[-*]\s/.test(line) || /^[A-Z][\.、]\s/.test(line)) {
+        const option = line.replace(/^[-*]\s*/, '').replace(/^[A-Z][\.、]\s*/, '').trim()
+        if (option) {
+          currentQuestion.options.push(option)
+        }
+      }
+      // 检测答案（答案：或 正确答案：）
+      else if (/^答案[：:]\s*/.test(line) || /^正确答案[：:]\s*/.test(line)) {
+        currentQuestion.answer = line.replace(/^答案[：:]\s*/, '').replace(/^正确答案[：:]\s*/, '').trim()
+      }
+      // 检测标签
+      else if (/^标签[：:]\s*/.test(line)) {
+        const tags = line.replace(/^标签[：:]\s*/, '').trim()
+        currentQuestion.tags = tags.split(/[，,、]/).map((t) => t.trim()).filter(Boolean)
+      }
+    }
+  }
+  
+  // 保存最后一题
+  if (currentQuestion && currentQuestion.title) {
+    questions.push(normalizeRecord(currentQuestion, questionIndex++))
+  }
+  
+  if (questions.length === 0) {
+    warnings.push('未能从 Markdown 文件中解析出题目，请检查格式')
+  }
+  
+  return { questions, warnings }
+}
+
+/**
+ * 解析 XML 文件
+ * - 支持简单的 XML 格式题目
+ */
+export function parseXML(text: string): ParseResult {
+  try {
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(text, 'text/xml')
+    
+    // 检查解析错误
+    const parseError = xmlDoc.querySelector('parsererror')
+    if (parseError) {
+      return {
+        questions: [],
+        warnings: ['XML 解析失败，请检查文件格式是否正确'],
+      }
+    }
+    
+    // 查找题目节点（支持多种可能的标签名）
+    const questionNodes = xmlDoc.querySelectorAll('question, item, 题目, 问题')
+    
+    if (questionNodes.length === 0) {
+      return {
+        questions: [],
+        warnings: ['XML 文件中未找到题目节点，请检查 XML 结构'],
+      }
+    }
+    
+    const questions: ImportedQuestion[] = []
+    const warnings: string[] = []
+    
+    questionNodes.forEach((node, index) => {
+      const record: any = {}
+      
+      // 提取题目标题
+      const titleNode = node.querySelector('title, 题目, 问题, text, 题干')
+      record.title = titleNode?.textContent?.trim() || ''
+      
+      // 提取类型
+      const typeNode = node.querySelector('type, 类型, 题型')
+      record.type = typeNode?.textContent?.trim() || 'single'
+      
+      // 提取选项
+      const optionNodes = node.querySelectorAll('option, 选项, choice, 备选项')
+      record.options = Array.from(optionNodes).map((opt) => opt.textContent?.trim() || '').filter(Boolean)
+      
+      // 提取答案
+      const answerNode = node.querySelector('answer, 答案, 正确答案, correct')
+      record.answer = answerNode?.textContent?.trim() || ''
+      
+      // 提取标签
+      const tagNodes = node.querySelectorAll('tag, 标签, category, 分类')
+      record.tags = Array.from(tagNodes).map((tag) => tag.textContent?.trim() || '').filter(Boolean)
+      
+      // 提取难度
+      const difficultyNode = node.querySelector('difficulty, 难度')
+      record.difficulty = difficultyNode?.textContent?.trim() || ''
+      
+      // 提取解析
+      const analysisNode = node.querySelector('analysis, 解析, explanation, 说明')
+      record.analysis = analysisNode?.textContent?.trim() || ''
+      
+      const normalized = normalizeRecord(record, index)
+      if (!normalized.title) {
+        warnings.push(`第 ${index + 1} 个题目节点缺少题目标题，已跳过`)
+        return
+      }
+      questions.push(normalized)
+    })
+    
+    return { questions, warnings }
+  } catch (error) {
+    return {
+      questions: [],
+      warnings: [`XML 解析失败: ${error instanceof Error ? error.message : '未知错误'}`],
     }
   }
 }

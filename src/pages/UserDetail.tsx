@@ -130,45 +130,46 @@ export default function UserDetail() {
   }, [userLinks])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => navigate('/admin/users')} className="btn-secondary flex items-center gap-2">
+        <button onClick={() => navigate('/admin/users')} className="btn-secondary flex items-center gap-2 text-sm sm:text-base">
           <ArrowLeft className="w-4 h-4" />
-          返回用户列表
+          <span className="hidden sm:inline">返回用户列表</span>
+          <span className="sm:hidden">返回</span>
         </button>
       </div>
 
       <div className="card bg-gradient-to-r from-primary-500 to-secondary-500 text-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{targetAccount.username}</h1>
-            <div className="flex items-center gap-4 text-white/80">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2 truncate">{targetAccount.username}</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-white/80 text-sm sm:text-base">
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                <span>{targetAccount.email}</span>
+                <Mail className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">{targetAccount.email}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>注册时间: {formatDate(targetAccount.createdAt)}</span>
+                <Calendar className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">注册: {formatDate(targetAccount.createdAt, 'yyyy-MM-dd')}</span>
               </div>
               {targetAccount.lastLoginAt && (
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  <span>最近登录: {formatDate(targetAccount.lastLoginAt)}</span>
+                  <Calendar className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">登录: {formatDate(targetAccount.lastLoginAt, 'MM-dd HH:mm')}</span>
                 </div>
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="flex flex-wrap gap-2 sm:flex-nowrap sm:flex-col sm:text-right">
             <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
+              className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                 targetAccount.role === 'admin' ? 'bg-purple-500/30 text-white' : 'bg-blue-500/30 text-white'
               }`}
             >
               {targetAccount.role === 'admin' ? '管理员' : '普通用户'}
             </span>
             <span
-              className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
+              className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
                 targetAccount.status === 'active' ? 'bg-green-500/30 text-white' : 'bg-red-500/30 text-white'
               }`}
             >
@@ -178,7 +179,7 @@ export default function UserDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center gap-3 mb-2">
             <LinkIcon className="w-5 h-5 text-primary-600" />
@@ -307,26 +308,34 @@ export default function UserDetail() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 px-4 sm:px-6 lg:px-8">
+          <table className="w-full text-xs sm:text-sm min-w-[500px]">
             <thead>
-              <tr className="border-b bg-muted">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">时间</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">操作</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">目标</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">类型</th>
+              <tr className="border-b bg-muted text-gray-700 dark:text-gray-300">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold">时间</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold">操作</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden md:table-cell">目标</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden lg:table-cell">类型</th>
               </tr>
             </thead>
             <tbody>
               {userLogs.slice(0, 50).map((log) => (
-                <tr key={log.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-600">{formatDate(log.timestamp)}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700">{log.action}</span>
+                <tr key={log.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400">
+                    {formatDate(log.timestamp, 'MM-dd HH:mm')}
                   </td>
-                  <td className="py-3 px-4 text-gray-700">{log.target}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{log.targetType}</span>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4">
+                    <span className="px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                      {log.action}
+                    </span>
+                  </td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 dark:text-gray-300 hidden md:table-cell truncate max-w-[150px]">
+                    {log.target}
+                  </td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 hidden lg:table-cell">
+                    <span className="px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                      {log.targetType}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -341,42 +350,49 @@ export default function UserDetail() {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">生成的链接</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-4">生成的链接</h3>
+        <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 px-4 sm:px-6 lg:px-8">
+          <table className="w-full text-xs sm:text-sm min-w-[600px]">
             <thead>
-              <tr className="border-b bg-muted">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">链接URL</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">问卷类型</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">状态</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">生成时间</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">使用时间</th>
+              <tr className="border-b bg-muted text-gray-700 dark:text-gray-300">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold">链接URL</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden sm:table-cell">问卷类型</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold">状态</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden md:table-cell">生成时间</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold hidden lg:table-cell">使用时间</th>
               </tr>
             </thead>
             <tbody>
               {userLinks.slice(0, 20).map((link) => (
-                <tr key={link.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4">
-                    <code className="text-sm text-gray-800 font-mono break-all">{link.url}</code>
+                <tr key={link.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4">
+                    <code className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 font-mono break-all">{link.url}</code>
+                    <div className="sm:hidden text-xs text-gray-500 dark:text-gray-400 mt-1">{link.questionnaireType}</div>
                   </td>
-                  <td className="py-3 px-4 text-gray-700">{link.questionnaireType}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 dark:text-gray-300 hidden sm:table-cell">
+                    {link.questionnaireType}
+                  </td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4">
                     <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      className={`px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium ${
                         link.status === 'used'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                           : link.status === 'unused'
-                            ? 'bg-gray-100 text-gray-700'
+                            ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                             : link.status === 'expired'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-red-100 text-red-700'
+                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                       }`}
                     >
                       {link.status === 'used' ? '已使用' : link.status === 'unused' ? '未使用' : link.status === 'expired' ? '已过期' : '已禁用'}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-600 text-sm">{formatDate(link.createdAt)}</td>
-                  <td className="py-3 px-4 text-gray-600 text-sm">{link.usedAt ? formatDate(link.usedAt) : '-'}</td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400 hidden md:table-cell text-xs sm:text-sm">
+                    {formatDate(link.createdAt, 'MM-dd HH:mm')}
+                  </td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400 hidden lg:table-cell text-xs sm:text-sm">
+                    {link.usedAt ? formatDate(link.usedAt, 'MM-dd HH:mm') : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

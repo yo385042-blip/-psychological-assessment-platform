@@ -190,65 +190,76 @@ export default function AuditLogs() {
         </div>
       </section>
 
-      <section className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <section className="card -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 rounded-none sm:rounded-2xl">
+        <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 px-4 sm:px-6 lg:px-8">
+          <table className="w-full text-xs sm:text-sm min-w-[600px]">
             <thead>
-              <tr className="border-b bg-muted text-gray-600">
-                <th className="py-3 px-4 text-left">时间</th>
-                <th className="py-3 px-4 text-left">用户</th>
-                <th className="py-3 px-4 text-left">操作</th>
-                <th className="py-3 px-4 text-left">目标</th>
-                <th className="py-3 px-4 text-left">类型</th>
-                <th className="py-3 px-4 text-left">详情</th>
+              <tr className="border-b bg-muted text-gray-600 dark:text-gray-400">
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">时间</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">用户</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">操作</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden md:table-cell">目标</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden lg:table-cell">类型</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden xl:table-cell">详情</th>
               </tr>
             </thead>
             <tbody>
               {filteredLogs.slice(0, 100).map(log => {
                 const account = userMap.get(log.userId)
                 return (
-                  <tr key={log.id} className="border-b last:border-0 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-600">{formatDate(log.timestamp)}</td>
-                    <td className="py-3 px-4">
+                  <tr key={log.id} className="border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400 text-xs sm:text-sm">
+                      {formatDate(log.timestamp, 'MM-dd HH:mm')}
+                    </td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4">
                       <div
-                        className="cursor-pointer rounded-lg p-2 -m-2 hover:bg-gray-100"
+                        className="cursor-pointer rounded-lg p-1 sm:p-2 -m-1 sm:-m-2 hover:bg-gray-100 dark:hover:bg-gray-700"
                         onClick={() => account && navigate(`/admin/users/${account.id}`)}
                         title={account ? `查看 ${account.email}` : '用户不存在'}
                       >
-                        <div className="flex items-center gap-2 text-gray-900">
-                          <User className="w-4 h-4 text-gray-400" />
-                          <span>{log.username}</span>
+                        <div className="flex items-center gap-1 sm:gap-2 text-gray-900 dark:text-white">
+                          <User className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-xs sm:text-sm truncate">{log.username}</span>
                           {account && (
-                            <span className={`px-1.5 py-0.5 text-xs rounded ${account.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            <span className={`px-1 sm:px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${account.role === 'admin' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'}`}>
                               {account.role === 'admin' ? '管理员' : '用户'}
                             </span>
                           )}
                         </div>
                         {account ? (
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Mail className="w-3 h-3" />
-                            <span>{account.email}</span>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <Mail className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{account.email}</span>
                           </div>
                         ) : (
-                          <p className="text-xs text-gray-400">用户ID：{log.userId}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">用户ID：{log.userId}</p>
                         )}
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-700">{log.action}</span>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4">
+                      <span className="px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
+                        {log.action}
+                      </span>
                     </td>
-                    <td className="py-3 px-4 text-gray-700">{log.target}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{log.targetType}</span>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 dark:text-gray-300 hidden md:table-cell text-xs sm:text-sm truncate max-w-[150px]">
+                      {log.target}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 hidden lg:table-cell">
+                      <span className="px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                        {log.targetType}
+                      </span>
+                    </td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 hidden xl:table-cell">
                       {log.details ? (
-                        <button className="text-primary-600 hover:text-primary-700 flex items-center gap-1" onClick={() => showAlert('操作详情', JSON.stringify(log.details, null, 2), 'info')}>
-                          <FileText className="w-4 h-4" />
-                          查看
+                        <button 
+                          className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 flex items-center gap-1 p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded text-xs sm:text-sm" 
+                          onClick={() => showAlert('操作详情', JSON.stringify(log.details, null, 2), 'info')}
+                        >
+                          <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">查看</span>
                         </button>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-gray-400 dark:text-gray-500">-</span>
                       )}
                     </td>
                   </tr>

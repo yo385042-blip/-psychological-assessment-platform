@@ -174,14 +174,16 @@ export default function LinksGenerate() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-gray-700">选择问卷类型</label>
-              <RouterLink
-                to="/admin/questions/import"
-                className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
-              >
-                <Database className="w-3 h-3" />
-                题库管理
-                <ExternalLink className="w-3 h-3" />
-              </RouterLink>
+              {isAdmin && (
+                <RouterLink
+                  to="/admin/questions/import"
+                  className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  <Database className="w-3 h-3" />
+                  题库管理
+                  <ExternalLink className="w-3 h-3" />
+                </RouterLink>
+              )}
             </div>
             <select
               value={questionnaireType}
@@ -212,7 +214,7 @@ export default function LinksGenerate() {
                     </span>
                   ))}
                 </div>
-                {selectedQuestionnaire.isCustom && (
+                {selectedQuestionnaire.isCustom && isAdmin && (
                   <div className="mt-2 pt-2 border-t border-gray-200">
                     <RouterLink
                       to="/admin/questions/import"

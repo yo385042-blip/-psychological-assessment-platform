@@ -87,22 +87,22 @@ export default function UserManagement() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full">
       {DialogComponent}
       {InputDialogComponent}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-text">用户管理</h1>
-          <p className="text-gray-600 mt-2">管理员可查看所有账号的状态并管理注册用户数据</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-text">用户管理</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">管理员可查看所有账号的状态并管理注册用户数据</p>
         </div>
-        <button onClick={handleClear} className="btn-secondary flex items-center gap-2">
+        <button onClick={handleClear} className="btn-secondary flex items-center gap-2 w-full sm:w-auto justify-center">
           <Trash2 className="w-4 h-4" />
-          清理注册用户数据
+          <span className="text-sm sm:text-base">清理注册用户数据</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="card">
           <p className="text-sm text-gray-500">账号总数</p>
           <p className="text-3xl font-bold text-text mt-2">{accounts.length}</p>
@@ -117,29 +117,106 @@ export default function UserManagement() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-text flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            用户列表
+      <div className="card -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 rounded-none sm:rounded-2xl">
+        <div className="flex items-center justify-between mb-4 px-4 sm:px-6 lg:px-8">
+          <h2 className="text-lg sm:text-xl font-semibold text-text flex items-center gap-2">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>用户列表</span>
           </h2>
         </div>
-        <div className="overflow-x-auto">
+        
+        {/* 移动端卡片视图 */}
+        <div className="block md:hidden px-4 space-y-3">
+          {accounts.map((account) => (
+            <div
+              key={account.id}
+              className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+              onClick={() => navigate(`/admin/users/${account.id}`)}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-text text-sm truncate">{account.username}</h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-1">{account.email}</p>
+                </div>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[account.status]}`}>
+                  {account.status === 'active' ? '正常' : '已禁用'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-500">角色：</span>
+                  <span className="text-text ml-1">{account.role === 'admin' ? '管理员' : '普通用户'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">剩余额度：</span>
+                  <span className="text-text ml-1">
+                    {account.role === 'admin' ? (
+                      <span className="text-primary-600 font-semibold">无限</span>
+                    ) : (
+                      `${formatNumber(account.remainingQuota ?? 0)} 条`
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleAddQuota(account.id, account.username, account.role)
+                  }}
+                  className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={account.role === 'admin'}
+                >
+                  <Plus className="w-3 h-3" />
+                  添加额度
+                </button>
+                {!account.isDefault && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleStatus(account.id, account.status)
+                    }}
+                    className={`flex items-center gap-1 text-xs ${
+                      account.status === 'active'
+                        ? 'text-danger hover:text-danger/80'
+                        : 'text-success hover:text-success/80'
+                    }`}
+                  >
+                    {account.status === 'active' ? (
+                      <>
+                        <UserMinus className="w-3 h-3" />
+                        禁用
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-3 h-3" />
+                        启用
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 桌面端表格视图 */}
+        <div className="hidden md:block overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 px-4 sm:px-6 lg:px-8">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-muted text-text text-sm">
-                <th className="text-left py-3 px-4 font-semibold">用户名</th>
-                <th className="text-left py-3 px-4 font-semibold">邮箱</th>
-                <th className="text-left py-3 px-4 font-semibold">角色</th>
-                <th className="text-left py-3 px-4 font-semibold">类型</th>
-                <th className="text-left py-3 px-4 font-semibold">累计总额度</th>
-                <th className="text-left py-3 px-4 font-semibold">累计使用额度</th>
-                <th className="text-left py-3 px-4 font-semibold">剩余额度</th>
-                <th className="text-left py-3 px-4 font-semibold">状态</th>
-                <th className="text-left py-3 px-4 font-semibold">创建时间</th>
-                <th className="text-left py-3 px-4 font-semibold">最近一次在线日期</th>
-                <th className="text-left py-3 px-4 font-semibold">累计充值金额</th>
-                <th className="text-left py-3 px-4 font-semibold">操作</th>
+              <tr className="border-b bg-muted text-text text-xs sm:text-sm">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap">用户名</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden md:table-cell">邮箱</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap">角色</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden lg:table-cell">类型</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden xl:table-cell">累计总额度</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden xl:table-cell">累计使用额度</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap">剩余额度</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap">状态</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden lg:table-cell">创建时间</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden xl:table-cell">最近一次在线日期</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap hidden xl:table-cell">累计充值金额</th>
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -149,60 +226,67 @@ export default function UserManagement() {
                   className="border-b hover:bg-muted/50 cursor-pointer"
                   onClick={() => navigate(`/admin/users/${account.id}`)}
                 >
-                  <td className="py-3 px-4 font-medium text-text">{account.username}</td>
-                  <td className="py-3 px-4 text-gray-600">{account.email}</td>
-                  <td className="py-3 px-4">{account.role === 'admin' ? '管理员' : '普通用户'}</td>
-                  <td className="py-3 px-4">{account.isDefault ? '系统内置' : '注册用户'}</td>
-                  <td className="py-3 px-4 text-gray-700">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium text-text text-xs sm:text-sm">{account.username}</td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm hidden md:table-cell">{account.email}</td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm">{account.role === 'admin' ? '管理员' : '普通用户'}</td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm hidden lg:table-cell">{account.isDefault ? '系统内置' : '注册用户'}</td>
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm hidden xl:table-cell">
                     {account.role === 'admin' ? (
                       <span className="text-primary-600 font-semibold">无限</span>
                     ) : (
                       `${formatNumber(account.totalQuota || account.remainingQuota || 0)} 条`
                     )}
                   </td>
-                  <td className="py-3 px-4 text-gray-700">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm hidden xl:table-cell">
                     {account.role === 'admin' ? (
                       <span className="text-gray-400">—</span>
                     ) : (
                       `${formatNumber(account.totalUsedQuota || 0)} 条`
                     )}
                   </td>
-                  <td className="py-3 px-4 text-gray-700">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm">
                     {account.role === 'admin' ? (
                       <span className="text-primary-600 font-semibold">无限</span>
                     ) : (
                       `${formatNumber(account.remainingQuota ?? 0)} 条`
                     )}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[account.status]}`}>
                       {account.status === 'active' ? '正常' : '已禁用'}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-500">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-500 text-xs sm:text-sm hidden lg:table-cell">
                     {formatDate(account.createdAt, 'yyyy-MM-dd')}
                   </td>
-                  <td className="py-3 px-4 text-gray-500">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-500 text-xs sm:text-sm hidden xl:table-cell">
                     {account.lastLoginAt ? formatDate(account.lastLoginAt, 'yyyy-MM-dd HH:mm') : '—'}
                   </td>
-                  <td className="py-3 px-4 text-gray-700 font-medium">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 font-medium text-xs sm:text-sm hidden xl:table-cell">
                     {formatCurrency(account.totalRecharge || 0)}
                   </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
+                  <td className="py-2 sm:py-3 px-2 sm:px-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
                       <button
-                        onClick={() => handleAddQuota(account.id, account.username, account.role)}
-                        className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAddQuota(account.id, account.username, account.role)
+                        }}
+                        className="flex items-center gap-1 text-xs sm:text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={account.role === 'admin' ? '管理员账号额度为无限' : '添加额度'}
                         disabled={account.role === 'admin'}
                       >
-                        <Plus className="w-4 h-4" />
-                        添加额度
+                        <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">添加额度</span>
+                        <span className="sm:hidden">添加</span>
                       </button>
                       {!account.isDefault && (
                         <button
-                          onClick={() => handleToggleStatus(account.id, account.status)}
-                          className={`flex items-center gap-1 text-sm ${
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggleStatus(account.id, account.status)
+                          }}
+                          className={`flex items-center gap-1 text-xs sm:text-sm ${
                             account.status === 'active'
                               ? 'text-danger hover:text-danger/80'
                               : 'text-success hover:text-success/80'
@@ -210,13 +294,13 @@ export default function UserManagement() {
                         >
                           {account.status === 'active' ? (
                             <>
-                              <UserMinus className="w-4 h-4" />
-                              禁用
+                              <UserMinus className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">禁用</span>
                             </>
                           ) : (
                             <>
-                              <ShieldCheck className="w-4 h-4" />
-                              启用
+                              <ShieldCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">启用</span>
                             </>
                           )}
                         </button>

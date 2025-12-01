@@ -347,5 +347,76 @@ export class NotificationDB {
   }
 }
 
+/**
+ * 订单相关操作（支付订单）
+ */
+export class OrderDB {
+  constructor(kv) {
+    this.kv = kv
+    this.orderPrefix = 'order:'
+    this.orderIndexKey = 'orders:index'
+    this.outTradeIndexPrefix = 'order:out_trade_no:'
+  }
 
+  async getOrderById(orderId) {
+    const data = await this.kv.get(`${this.orderPrefix}${orderId}`)
+    return data ? JSON.parse(data) : null
+  }
+
+  async getOrderByOutTradeNo(outTradeNo) {
+    const key = `${this.outTradeIndexPrefix}${outTradeNo}`
+    const orderId = await this.kv.get(key)
+    if (!orderId) return null
+    return this.getOrderById(orderId)
+  }
+
+  async createOrder(order) {
+    const orderId = generateId()
+    const now = new Date().toISOString()
+    const newOrder = {
+      ...order,
+      id: orderId,
+      status: order.status || 'pending', // pending | paid | failed
+      createdAt: now,
+    }
+
+    await this.kv.put(`${this.orderPrefix}${orderId}`, JSON.stringify(newOrder))
+
+    // 索引：全部订单
+    const index = await this.kv.get(this.orderIndexKey)
+    const orderIds = index ? JSON.parse(index) : []
+    orderIds.push(orderId)
+    await this.kv.put(this.orderIndexKey, JSON.stringify(orderIds))
+
+    // 索引：按 out_trade_no 快速查找
+    if (newOrder.outTradeNo) {
+      await this.kv.put(`${this.outTradeIndexPrefix}${newOrder.outTradeNo}`, orderId)
+    }
+
+    return newOrder
+  }
+
+  async updateOrder(orderId, updates) {
+    const order = await this.getOrderById(orderId)
+    if (!order) return null
+
+    const updated = {
+      ...order,
+      ...updates,
+      id: orderId,
+    }
+
+    await this.kv.put(`${this.orderPrefix}${orderId}`, JSON.stringify(updated))
+
+    // 如果更新了 outTradeNo，刷新索引
+    if (updates.outTradeNo && updates.outTradeNo !== order.outTradeNo) {
+      if (order.outTradeNo) {
+        await this.kv.delete(`${this.outTradeIndexPrefix}${order.outTradeNo}`)
+      }
+      await this.kv.put(`${this.outTradeIndexPrefix}${updates.outTradeNo}`, orderId)
+    }
+
+    return updated
+  }
+}
 

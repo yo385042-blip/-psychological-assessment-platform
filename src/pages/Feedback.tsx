@@ -1,272 +1,143 @@
-import { useState } from 'react'
-import { MessageSquare, Bug, Lightbulb, Heart, Database, Plus, HelpCircle, Award } from 'lucide-react'
-import { Feedback as FeedbackType } from '@/types'
+import { useMemo, useState } from 'react'
+import { MessageSquare, Filter, Search } from 'lucide-react'
 import { mockFeedbacks } from '@/data/mockData'
+import type { Feedback as FeedbackType } from '@/types'
 import { formatDate } from '@/utils/formatters'
-import { useConfirmDialog } from '@/components/ConfirmDialog'
 
-const feedbackTypes = [
-  { value: 'bug', label: 'Bug报告', icon: Bug, color: 'bg-red-100 text-red-800' },
-  { value: 'feature', label: '功能建议', icon: Lightbulb, color: 'bg-blue-100 text-blue-800' },
-  { value: 'experience', label: '体验反馈', icon: Heart, color: 'bg-purple-100 text-purple-800' },
-  { value: 'data', label: '数据问题', icon: Database, color: 'bg-yellow-100 text-yellow-800' },
-]
+const typeLabels: Record<FeedbackType['type'], string> = {
+  bug: '缺陷',
+  feature: '功能',
+  experience: '体验',
+  data: '数据',
+}
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: '待处理', color: 'bg-gray-100 text-gray-800' },
-  reviewing: { label: '审核中', color: 'bg-blue-100 text-blue-800' },
-  accepted: { label: '已采纳', color: 'bg-green-100 text-green-800' },
-  rejected: { label: '已拒绝', color: 'bg-red-100 text-red-800' },
-  completed: { label: '已完成', color: 'bg-purple-100 text-purple-800' },
+const statusLabels: Record<FeedbackType['status'], { label: string; className: string }> = {
+  pending: { label: '排队中', className: 'bg-gray-100 text-gray-600' },
+  reviewing: { label: '评估中', className: 'bg-secondary-50 text-secondary-600' },
+  accepted: { label: '已采纳', className: 'bg-primary-50 text-primary-600' },
+  rejected: { label: '已驳回', className: 'bg-dangerLight text-danger' },
+  completed: { label: '已完成', className: 'bg-success/10 text-success' },
 }
 
 export default function Feedback() {
-  const [feedbacks, setFeedbacks] = useState<FeedbackType[]>(mockFeedbacks)
-  const [showForm, setShowForm] = useState(false)
-  const [formData, setFormData] = useState({
-    type: 'feature' as FeedbackType['type'],
-    title: '',
-    content: '',
-  })
-  const { showAlert, DialogComponent } = useConfirmDialog()
+  const [keyword, setKeyword] = useState('')
+  const [typeFilter, setTypeFilter] = useState<'all' | FeedbackType['type']>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | FeedbackType['status']>('all')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const newFeedback: FeedbackType = {
-      id: Date.now().toString(),
-      ...formData,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    setFeedbacks(prev => [newFeedback, ...prev])
-    setFormData({ type: 'feature', title: '', content: '' })
-    setShowForm(false)
-    await showAlert('提交成功', '反馈提交成功！我们会尽快处理。', 'success')
-  }
+  const filtered = useMemo(() => {
+    return mockFeedbacks.filter((item) => {
+      const matchKeyword =
+        !keyword ||
+        item.title.toLowerCase().includes(keyword.toLowerCase()) ||
+        item.content.toLowerCase().includes(keyword.toLowerCase())
+      const matchType = typeFilter === 'all' || item.type === typeFilter
+      const matchStatus = statusFilter === 'all' || item.status === statusFilter
+      return matchKeyword && matchType && matchStatus
+    })
+  }, [keyword, typeFilter, statusFilter])
 
   return (
     <div className="space-y-6">
-      {DialogComponent}
-      
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">反馈建议</h1>
-          <p className="text-gray-600 mt-2">提交问题和建议，帮助我们改进平台。被采纳的建议将获得额度奖励！</p>
+          <h1 className="text-3xl font-bold text-gray-900">反馈中心</h1>
+          <p className="text-gray-600 mt-2">查看用户反馈与需求，跟进处理进度</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          提交反馈
+        <button className="btn-primary flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          新建反馈
         </button>
       </div>
 
-      {/* 反馈类型说明 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {feedbackTypes.map((type) => {
-          const Icon = type.icon
-          return (
-            <div key={type.value} className={`card ${type.color} border-2`}>
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-5 h-5" />
-                <h3 className="font-semibold text-sm">{type.label}</h3>
-              </div>
-              <p className="text-xs opacity-90">
-                {type.value === 'bug' && '报告功能异常、系统错误等'}
-                {type.value === 'feature' && '提出新功能需求或优化建议'}
-                {type.value === 'experience' && '分享使用体验和改进建议'}
-                {type.value === 'data' && '反馈测评数据准确性等问题'}
-              </p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* 提交表单 */}
-      {showForm && (
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">提交反馈</h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                反馈类型
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {feedbackTypes.map((type) => {
-                  const Icon = type.icon
-                  return (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, type: type.value as FeedbackType['type'] })}
-                      className={`p-4 rounded-lg border-2 transition-colors ${
-                        formData.type === type.value
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <Icon className="w-6 h-6 mx-auto mb-2" />
-                      <div className="text-sm font-medium">{type.label}</div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                标题
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="input"
-                placeholder="请输入反馈标题"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                详细内容
-              </label>
-              <textarea
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                className="input min-h-[120px]"
-                placeholder="请详细描述您的问题或建议..."
-                required
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button type="submit" className="btn-primary">
-                提交反馈
-              </button>
+      <div className="card space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="搜索标题或内容"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="input pl-11"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(['all', 'feature', 'bug', 'experience', 'data'] as const).map((type) => (
               <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="btn-secondary"
+                key={type}
+                onClick={() => setTypeFilter(type)}
+                className={`px-4 py-2 rounded-lg border text-sm ${
+                  typeFilter === type ? 'border-primary-500 text-primary-600' : 'border-gray-200 text-gray-600'
+                }`}
               >
-                取消
+                {type === 'all' ? '全部类型' : typeLabels[type]}
               </button>
-            </div>
-          </form>
+            ))}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {(['all', 'pending', 'reviewing', 'accepted', 'completed', 'rejected'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 rounded-lg border text-sm ${
+                  statusFilter === status ? 'border-secondary-500 text-secondary-600' : 'border-gray-200 text-gray-600'
+                }`}
+              >
+                {status === 'all' ? '全部状态' : statusLabels[status].label}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <Filter className="w-4 h-4" />
+          共筛选到 {filtered.length} 条反馈
+        </div>
+      </div>
 
-      {/* 反馈列表 */}
       <div className="space-y-4">
-        {feedbacks.map((feedback) => {
-          const typeConfig = feedbackTypes.find(t => t.value === feedback.type)
-          const TypeIcon = typeConfig?.icon || MessageSquare
-
-          return (
-            <div key={feedback.id} className="card">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={`p-3 rounded-lg ${typeConfig?.color || 'bg-gray-100'}`}>
-                    <TypeIcon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{feedback.title}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig[feedback.status].color}`}>
-                        {statusConfig[feedback.status].label}
-                      </span>
-                    </div>
-                    <p className="text-gray-700 mb-3">{feedback.content}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>{formatDate(feedback.createdAt)}</span>
-                      {feedback.reward && (
-                        <span className="text-green-600 font-medium">
-                          奖励：{feedback.reward} 额度
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+        {filtered.map((item) => (
+          <div key={item.id} className="card">
+            <div className="flex flex-wrap justify-between gap-3">
+              <div>
+                <p className="text-sm text-gray-500">#{item.id}</p>
+                <h3 className="text-xl font-semibold text-gray-900">{item.title}</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-600">
+                  {typeLabels[item.type]}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusLabels[item.status].className}`}>
+                  {statusLabels[item.status].label}
+                </span>
+                {item.reward && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-600">
+                    悬赏 ¥{item.reward}
+                  </span>
+                )}
               </div>
             </div>
-          )
-        })}
-      </div>
 
-      {/* 奖励说明 */}
-      <div className="card bg-gradient-to-r from-green-50 to-blue-50 border border-green-200">
-        <div className="flex items-start gap-3">
-          <Award className="w-6 h-6 text-green-600 flex-shrink-0 mt-1" />
-          <div className="flex-1">
-            <h3 className="font-semibold text-green-900 mb-3">奖励机制</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 text-sm text-green-800">
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <div>
-                    <p className="font-medium">额度奖励</p>
-                    <p className="text-xs text-green-700 mt-1">被采纳的建议将获得50-500额度奖励</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <div>
-                    <p className="font-medium">贡献记录</p>
-                    <p className="text-xs text-green-700 mt-1">记录您的所有贡献历史</p>
-                  </div>
-                </div>
+            <p className="text-gray-600 leading-relaxed mt-3">{item.content}</p>
+
+            <div className="flex flex-wrap items-center justify-between text-sm text-gray-500 mt-4">
+              <div className="flex gap-4">
+                <span>创建：{formatDate(item.createdAt, 'yyyy-MM-dd HH:mm')}</span>
+                <span>更新：{formatDate(item.updatedAt, 'yyyy-MM-dd HH:mm')}</span>
               </div>
-              <div className="space-y-2 text-sm text-green-800">
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <div>
-                    <p className="font-medium">等级体系</p>
-                    <p className="text-xs text-green-700 mt-1">根据贡献度提升用户等级</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-green-600 font-bold">✓</span>
-                  <div>
-                    <p className="font-medium">特别致谢</p>
-                    <p className="text-xs text-green-700 mt-1">对重要贡献者公开致谢</p>
-                  </div>
-                </div>
+              <div className="flex gap-3">
+                <button className="text-primary-600 hover:text-primary-700">标记完成</button>
+                <button className="text-secondary-600 hover:text-secondary-700">回复用户</button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        ))}
 
-      {/* 反馈指南 */}
-      <div className="card bg-blue-50 border border-blue-200">
-        <div className="flex items-start gap-3">
-          <HelpCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-1" />
-          <div>
-            <h3 className="font-semibold text-blue-900 mb-2">反馈指南</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-blue-800">
-              <div>
-                <p className="font-medium mb-1">如何写好反馈？</p>
-                <ul className="list-disc list-inside space-y-1 text-xs text-blue-700">
-                  <li>详细描述问题或建议的具体内容</li>
-                  <li>提供可复现的步骤（Bug报告）</li>
-                  <li>说明期望的改进效果</li>
-                </ul>
-              </div>
-              <div>
-                <p className="font-medium mb-1">反馈处理流程</p>
-                <ul className="list-disc list-inside space-y-1 text-xs text-blue-700">
-                  <li>1-2个工作日内审核</li>
-                  <li>评估可行性后给予反馈</li>
-                  <li>采纳后发放奖励</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+        {filtered.length === 0 && (
+          <div className="card text-center py-12 text-gray-500">暂无符合条件的反馈</div>
+        )}
       </div>
     </div>
   )
 }
+
 

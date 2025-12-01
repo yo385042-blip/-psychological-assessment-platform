@@ -150,49 +150,52 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {DialogComponent}
       
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">仪表盘</h1>
-        <p className="text-gray-600 mt-2">查看平台整体数据概览和实时监控</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">仪表盘</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 sm:mt-2">查看平台整体数据概览和实时监控</p>
       </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
           {(['7d', '15d', '30d'] as Array<'7d' | '15d' | '30d'>).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setTimeframe(option)}
-              className={`px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
-                timeframe === option ? 'bg-primary-600 text-white border-primary-600' : 'border-muted text-text'
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-medium transition-colors ${
+                timeframe === option ? 'bg-primary-600 text-white border-primary-600' : 'border-muted text-text dark:text-gray-300 dark:border-gray-600'
               }`}
             >
-              {option === '7d' ? '最近 7 天' : option === '15d' ? '最近 15 天' : '最近 30 天'}
+              <span className="hidden sm:inline">{option === '7d' ? '最近 7 天' : option === '15d' ? '最近 15 天' : '最近 30 天'}</span>
+              <span className="sm:hidden">{option === '7d' ? '7天' : option === '15d' ? '15天' : '30天'}</span>
             </button>
           ))}
           <button
             type="button"
             onClick={handleExportPDF}
-            className="px-4 py-2 rounded-xl border border-muted text-text flex items-center gap-2 hover:border-primary-400"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-muted text-text dark:text-gray-300 dark:border-gray-600 flex items-center gap-1 sm:gap-2 hover:border-primary-400 text-xs sm:text-sm"
             title="导出PDF报告"
           >
-            <Download className="w-4 h-4" />
-            导出PDF
+            <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">导出PDF</span>
+            <span className="sm:hidden">导出</span>
           </button>
           <button
             type="button"
             onClick={handleRefresh}
-            className="px-4 py-2 rounded-xl border border-muted text-text flex items-center gap-2 hover:border-primary-400"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl border border-muted text-text dark:text-gray-300 dark:border-gray-600 flex items-center gap-1 sm:gap-2 hover:border-primary-400 text-xs sm:text-sm"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? '刷新中' : '刷新数据'}
+            <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{refreshing ? '刷新中' : '刷新数据'}</span>
+            <span className="sm:hidden">{refreshing ? '刷新中' : '刷新'}</span>
           </button>
         </div>
       </div>
 
       {user?.role === 'admin' && (
-        <div className="bg-white border border-primary-100 text-primary-700 rounded-3xl p-8 shadow-lg flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between overflow-hidden relative">
+        <div className="bg-white dark:bg-gray-800 border border-primary-100 dark:border-gray-700 text-primary-700 dark:text-primary-400 rounded-xl sm:rounded-2xl lg:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-lg flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-center lg:justify-between overflow-hidden relative">
           <div className="space-y-4 max-w-2xl">
             <p className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-50 text-sm font-semibold text-primary-600">
               <Sparkles className="w-4 h-4" />
@@ -257,7 +260,7 @@ export default function Dashboard() {
       )}
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatsCard
           title="总链接个数"
           value={formatNumber(stats.totalLinks)}
@@ -292,14 +295,14 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold text-text">问卷使用概览</h2>
           <span className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600">实时刷新</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <table className="w-full text-xs sm:text-sm min-w-[500px]">
             <thead>
-              <tr className="text-left text-gray-500 border-b border-muted">
-                <th className="py-2">问卷类型</th>
-                <th className="py-2">参与人数</th>
-                <th className="py-2">完成率</th>
-                <th className="py-2">平均时长</th>
+              <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-muted">
+                <th className="py-2 px-2 sm:px-4">问卷类型</th>
+                <th className="py-2 px-2 sm:px-4">参与人数</th>
+                <th className="py-2 px-2 sm:px-4">完成率</th>
+                <th className="py-2 px-2 sm:px-4">平均时长</th>
               </tr>
             </thead>
             <tbody>
@@ -320,20 +323,20 @@ export default function Dashboard() {
                       : 'from-danger to-danger'
                 return (
                   <tr key={item.type} className="border-b border-muted/50 hover:bg-muted/30 transition">
-                    <td className="py-3 font-semibold text-text">{item.type}</td>
-                    <td className="py-3 text-gray-600">{formatNumber(item.participants)} 人</td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-2 flex-1 rounded-full bg-muted">
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 font-semibold text-text text-xs sm:text-sm">{item.type}</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm">{formatNumber(item.participants)} 人</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-2 flex-1 rounded-full bg-muted min-w-[60px]">
                           <div
                             className={`h-full rounded-full bg-gradient-to-r ${colorClass}`}
                             style={{ width: `${width}%` }}
                           />
                         </div>
-                        <span className="text-text font-semibold">{formatPercentage(item.completion)}</span>
+                        <span className="text-text font-semibold text-xs sm:text-sm whitespace-nowrap">{formatPercentage(item.completion)}</span>
                       </div>
                     </td>
-                    <td className="py-3 text-gray-600">{item.avgTime} 分钟</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 text-xs sm:text-sm">{item.avgTime} 分钟</td>
                   </tr>
                 )
               }))
@@ -344,7 +347,7 @@ export default function Dashboard() {
       </div>
 
       {/* 图表区域 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="card">
           <h2 className="text-xl font-semibold mb-4 text-text">链接使用趋势</h2>
           <ChartWrapper minHeight={320}>
@@ -401,7 +404,7 @@ export default function Dashboard() {
       </div>
 
       {/* 最近活动 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="card">
           <h2 className="text-xl font-semibold mb-4">最近生成的链接</h2>
           <div className="space-y-3">
@@ -455,7 +458,7 @@ export default function Dashboard() {
           <CalendarRange className="w-5 h-5 text-primary-600" />
           <h2 className="text-xl font-semibold text-text">实时运营追踪</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           {liveMetrics.map((metric) => {
             const isPercentage = metric.unit === 'percentage'
             const currentValue = isPercentage ? formatPercentage(metric.value) : `${metric.value} 分钟`

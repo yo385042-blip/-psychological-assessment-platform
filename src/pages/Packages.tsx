@@ -47,7 +47,7 @@ export default function Packages() {
       </div>
 
       {/* 套餐列表 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-6">
         {mockPackages.map((pkg) => {
           const quotaLabel = pkg.unlimited ? '全年不限量' : `${formatNumber(pkg.quota)} 条`
           const pricePer = pkg.unlimited ? '不限次数 · 按年结算' : `约 ¥${(pkg.price / pkg.quota).toFixed(2)}/条`

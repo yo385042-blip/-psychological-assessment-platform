@@ -132,16 +132,16 @@ export default function LinksManage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {DialogComponent}
 
       <header className="space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">链接管理</h1>
-        <p className="text-gray-600">管理所有生成的测试链接，查看使用状态和报告详情。</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">链接管理</h1>
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">管理所有生成的测试链接，查看使用状态和报告详情。</p>
       </header>
 
       {/* 顶部功能模块卡片：快速搜索 / 状态筛选 / 报告查看 */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm flex items-center gap-4 dark:border-gray-700 dark:bg-gray-900">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-600">
             <Search className="w-5 h-5" />
@@ -172,21 +172,23 @@ export default function LinksManage() {
       </section>
 
       {/* 搜索 & 筛选区 */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-3 dark:border-gray-700 dark:bg-gray-900">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center">
-          <SearchInput
-            value={searchTerm}
-            onChange={setSearchTerm}
-            placeholder="搜索链接URL或问卷类型..."
-            suggestions={links.slice(0, 5).map((link) => link.questionnaireType)}
-          />
+      <section className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 shadow-sm space-y-3 dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center">
+          <div className="flex-1 min-w-0">
+            <SearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="搜索链接URL或问卷类型..."
+              suggestions={links.slice(0, 5).map((link) => link.questionnaireType)}
+            />
+          </div>
           <div className="flex gap-2 flex-wrap">
-            <label className="input flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400" />
+            <label className="input flex items-center gap-2 text-xs sm:text-sm">
+              <Filter className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as LinkStatus | 'all')}
-                className="bg-transparent flex-1 outline-none"
+                className="bg-transparent flex-1 outline-none text-xs sm:text-sm"
               >
                 <option value="all">全部状态</option>
                 <option value="unused">未使用</option>
@@ -195,7 +197,7 @@ export default function LinksManage() {
                 <option value="disabled">已禁用</option>
               </select>
             </label>
-            <select value={createdBy} onChange={(e) => setCreatedBy(e.target.value)} className="input">
+            <select value={createdBy} onChange={(e) => setCreatedBy(e.target.value)} className="input text-xs sm:text-sm">
               <option value="">全部创建者</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
@@ -203,13 +205,14 @@ export default function LinksManage() {
                 </option>
               ))}
             </select>
-            <button onClick={exportCSV} className="btn-secondary flex items-center gap-2">
-              <Download className="w-4 h-4" />
-              导出 CSV
+            <button onClick={exportCSV} className="btn-secondary flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4">
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">导出 CSV</span>
+              <span className="sm:hidden">导出</span>
             </button>
-            <button onClick={refresh} className="btn-secondary flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              刷新
+            <button onClick={refresh} className="btn-secondary flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-3 sm:px-4">
+              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">刷新</span>
             </button>
           </div>
         </div>
@@ -220,32 +223,36 @@ export default function LinksManage() {
       </section>
 
       {selected.length > 0 && (
-        <section className="rounded-2xl border border-primary-200 bg-primary-50 p-4 shadow-sm flex flex-wrap items-center gap-3">
-          <span className="font-medium text-primary-900">批量操作：</span>
-          <button className="btn-secondary text-sm flex items-center gap-1" onClick={() => changeStatus('unused', selected)}>
-            <CheckSquare className="w-4 h-4" /> 设为未使用
+        <section className="rounded-2xl border border-primary-200 bg-primary-50 dark:bg-primary-900/20 p-3 sm:p-4 shadow-sm flex flex-wrap items-center gap-2 sm:gap-3">
+          <span className="font-medium text-primary-900 dark:text-primary-100 text-sm sm:text-base">批量操作：</span>
+          <button className="btn-secondary text-xs sm:text-sm flex items-center gap-1 px-2 sm:px-3" onClick={() => changeStatus('unused', selected)}>
+            <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4" /> 
+            <span className="hidden sm:inline">设为未使用</span>
+            <span className="sm:hidden">未使用</span>
           </button>
-          <button className="btn-secondary text-sm flex items-center gap-1" onClick={() => changeStatus('disabled', selected)}>
-            <Square className="w-4 h-4" /> 禁用
+          <button className="btn-secondary text-xs sm:text-sm flex items-center gap-1 px-2 sm:px-3" onClick={() => changeStatus('disabled', selected)}>
+            <Square className="w-3 h-3 sm:w-4 sm:h-4" /> 
+            <span className="hidden sm:inline">禁用</span>
           </button>
           <button
-            className="btn-secondary text-sm flex items-center gap-1 text-danger hover:bg-dangerLight"
+            className="btn-secondary text-xs sm:text-sm flex items-center gap-1 text-danger hover:bg-dangerLight px-2 sm:px-3"
             onClick={() => confirmDelete(selected)}
           >
-            <Trash2 className="w-4 h-4" /> 删除
+            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" /> 
+            <span className="hidden sm:inline">删除</span>
           </button>
-          <button className="text-sm text-primary-600" onClick={() => setSelected([])}>
+          <button className="text-xs sm:text-sm text-primary-600 dark:text-primary-400 px-2 sm:px-3" onClick={() => setSelected([])}>
             取消选择
           </button>
         </section>
       )}
 
       {/* 链接列表表格 */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm overflow-x-auto dark:border-gray-700 dark:bg-gray-900">
+      <section className="rounded-2xl border border-gray-200 bg-white p-2 sm:p-4 shadow-sm overflow-x-auto dark:border-gray-700 dark:bg-gray-900">
         {paged.length === 0 ? (
           <EmptyState
             title="暂无链接"
-            description="还没有生成过测试链接，点击“链接生成”即可创建。"
+            description='还没有生成过测试链接，点击"链接生成"即可创建。'
             action={
               <RouterLink className="btn-primary" to="/links/generate">
                 去生成
@@ -253,58 +260,73 @@ export default function LinksManage() {
             }
           />
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm min-w-[600px]">
             <thead>
-              <tr className="border-b bg-muted text-left text-gray-500">
-                <th className="py-3 px-3 w-10">
-                  <button onClick={toggleSelectAll} title="全选/取消">
+              <tr className="border-b bg-muted text-left text-gray-500 dark:text-gray-400">
+                <th className="py-2 sm:py-3 px-2 sm:px-3 w-8 sm:w-10">
+                  <button onClick={toggleSelectAll} title="全选/取消" className="p-1">
                     {selected.length === paged.length && paged.length > 0 ? (
-                      <CheckSquare className="w-4 h-4 text-primary-600" />
+                      <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600" />
                     ) : (
-                      <Square className="w-4 h-4 text-gray-400" />
+                      <Square className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
                     )}
                   </button>
                 </th>
-                <th className="py-3 px-3">链接</th>
-                <th className="py-3 px-3">问卷类型</th>
-                <th className="py-3 px-3">状态</th>
-                <th className="py-3 px-3">生成时间</th>
-                <th className="py-3 px-3">使用时间</th>
-                <th className="py-3 px-3 text-right">操作</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3">链接</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3 hidden sm:table-cell">问卷类型</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3">状态</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3 hidden md:table-cell">生成时间</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3 hidden lg:table-cell">使用时间</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody>
               {paged.map((link) => (
-                <tr key={link.id} className="border-b last:border-0">
-                  <td className="py-2 px-3">
-                    <input type="checkbox" checked={selected.includes(link.id)} onChange={() => toggleSelect(link.id)} />
+                <tr key={link.id} className="border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  <td className="py-2 px-2 sm:px-3">
+                    <input 
+                      type="checkbox" 
+                      checked={selected.includes(link.id)} 
+                      onChange={() => toggleSelect(link.id)}
+                      className="w-3 h-3 sm:w-4 sm:h-4"
+                    />
                   </td>
-                  <td className="py-2 px-3">
-                    <code className="text-xs break-all">{link.url}</code>
+                  <td className="py-2 px-2 sm:px-3">
+                    <code className="text-xs break-all font-mono">{link.url}</code>
+                    <div className="sm:hidden text-xs text-gray-500 mt-1">{link.questionnaireType}</div>
                   </td>
-                  <td className="py-2 px-3">{link.questionnaireType}</td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-2 sm:px-3 hidden sm:table-cell">{link.questionnaireType}</td>
+                  <td className="py-2 px-2 sm:px-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${statusConfig[link.status].badge}`}>
                       {statusConfig[link.status].label}
                     </span>
                   </td>
-                  <td className="py-2 px-3">{formatDate(link.createdAt)}</td>
-                  <td className="py-2 px-3">{link.usedAt ? formatDate(link.usedAt) : '-'}</td>
-                  <td className="py-2 px-3">
-                    <div className="flex gap-3 justify-end text-primary-600">
-                      <button onClick={() => navigator.clipboard.writeText(link.url)} title="复制链接">
-                        <Copy className="w-4 h-4" />
+                  <td className="py-2 px-2 sm:px-3 text-gray-600 dark:text-gray-400 hidden md:table-cell text-xs sm:text-sm">
+                    {formatDate(link.createdAt, 'MM-dd HH:mm')}
+                  </td>
+                  <td className="py-2 px-2 sm:px-3 text-gray-600 dark:text-gray-400 hidden lg:table-cell text-xs sm:text-sm">
+                    {link.usedAt ? formatDate(link.usedAt, 'MM-dd HH:mm') : '-'}
+                  </td>
+                  <td className="py-2 px-2 sm:px-3">
+                    <div className="flex gap-2 sm:gap-3 justify-end text-primary-600">
+                      <button onClick={() => navigator.clipboard.writeText(link.url)} title="复制链接" className="p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded">
+                        <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
                       </button>
                       <button
                         onClick={() =>
                           link.reportId ? window.open(`/reports/${link.reportId}`, '_blank') : toast('尚无报告')
                         }
                         title="查看报告"
+                        className="p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded"
                       >
-                        <FileText className="w-4 h-4" />
+                        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
                       </button>
-                      <button onClick={() => confirmDelete([link.id])} title="删除" className="text-danger">
-                        <Trash2 className="w-4 h-4" />
+                      <button 
+                        onClick={() => confirmDelete([link.id])} 
+                        title="删除" 
+                        className="text-danger p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      >
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </td>
@@ -316,7 +338,7 @@ export default function LinksManage() {
       </section>
 
       {/* 底部统计卡片区 */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
           <p className="text-sm text-gray-500">总链接数</p>
           <p className="text-2xl font-semibold text-gray-900 mt-1">{stats.total ?? 0}</p>

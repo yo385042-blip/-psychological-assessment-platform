@@ -6,7 +6,8 @@
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '../utils/response.js'
 import { verifyAuth, requireAdmin, hashPassword, verifyPassword } from '../utils/auth.js'
 import { generateToken } from '../utils/jwt.js'
-import { UserDB, LinkDB, QuestionnaireDB, NotificationDB } from '../utils/db.js'
+import { UserDB, LinkDB, QuestionnaireDB, NotificationDB, OrderDB } from '../utils/db.js'
+import { md5Sign, verifyMd5Sign } from '../utils/zpay.js'
 
 // 初始化数据库实例（KV 会在运行时从环境变量获取）
 function getDB(context) {
@@ -26,6 +27,7 @@ function getDB(context) {
     links: new LinkDB(kv),
     questionnaires: new QuestionnaireDB(kv),
     notifications: new NotificationDB(kv),
+    orders: new OrderDB(kv),
   }
 }
 
@@ -91,6 +93,11 @@ export async function onRequest(context) {
  */
 async function routeHandler(pathSegments, method, request, db, env) {
   const [resource, action, ...rest] = pathSegments
+
+  // 支付相关路由（部分开放）
+  if (resource === 'payment') {
+    return handlePaymentRoutes(action, method, request, db, env)
+  }
 
   // 认证相关路由（不需要认证）
   if (resource === 'auth') {
@@ -171,6 +178,136 @@ async function handleAuthRoutes(action, method, request, db, env, userId = null)
   }
 
   return notFoundResponse('认证路由不存在')
+}
+
+/**
+ * 支付路由处理（易支付）
+ * - /api/payment/create  前端创建支付链接
+ * - /api/payment/notify  易支付异步通知回调
+ */
+async function handlePaymentRoutes(action, method, request, db, env) {
+  const pid = env.ZPAY_PID
+  const key = env.ZPAY_KEY
+
+  if (!pid || !key) {
+    return errorResponse('支付配置未完成，请在环境变量中配置 ZPAY_PID 与 ZPAY_KEY', 500)
+  }
+
+  // 创建支付链接：返回签名后的 submit.php URL，由前端重定向
+  if (action === 'create' && method === 'POST') {
+    const body = await request.json()
+    const {
+      name,
+      money,
+      out_trade_no,
+      notify_url,
+      return_url,
+      type = 'alipay',
+      param = '',
+    } = body || {}
+
+    if (!name || !money || !out_trade_no || !notify_url || !return_url) {
+      return errorResponse('缺少必要参数', 400)
+    }
+
+    const baseParams = {
+      name,
+      money,
+      type,
+      out_trade_no,
+      notify_url,
+      pid,
+      param,
+      return_url,
+    }
+
+    // 创建本地订单（pending）
+    await db.orders.createOrder({
+      outTradeNo: out_trade_no,
+      name,
+      money,
+      questionnaireType: param,
+      payType: type,
+      status: 'pending',
+    })
+
+    const sign = md5Sign(baseParams, key)
+    const url = new URL('https://zpayz.cn/submit.php')
+    Object.entries({
+      ...baseParams,
+      sign,
+      sign_type: 'MD5',
+    }).forEach(([k, v]) => {
+      url.searchParams.set(k, String(v))
+    })
+
+    return successResponse({
+      payUrl: url.toString(),
+    })
+  }
+
+  // 易支付异步通知回调（notify_url）
+  if (action === 'notify' && method === 'GET') {
+    const url = new URL(request.url)
+    const params = Object.fromEntries(url.searchParams.entries())
+
+    // 验证签名
+    const valid = verifyMd5Sign(params, key)
+    if (!valid) {
+      return new Response('invalid sign', { status: 400 })
+    }
+
+    const { trade_status, out_trade_no, trade_no } = params
+    if (trade_status === 'TRADE_SUCCESS') {
+      // 根据 out_trade_no 查找订单
+      if (out_trade_no) {
+        const order = await db.orders.getOrderByOutTradeNo(out_trade_no)
+        if (order && order.status !== 'paid') {
+          // 为该订单生成一次性测试链接
+          const link = await db.links.createLink({
+            url: `${env.PUBLIC_BASE_URL || 'https://example.com'}/test/${order.outTradeNo}`,
+            questionnaireType: order.questionnaireType,
+            createdBy: order.userId || null,
+            source: 'zpay',
+          })
+
+          await db.orders.updateOrder(order.id, {
+            status: 'paid',
+            tradeNo: trade_no,
+            paidAt: new Date().toISOString(),
+            linkId: link.id,
+          })
+        }
+      }
+
+      return new Response('success', { status: 200 })
+    }
+
+    return new Response('ignored', { status: 200 })
+  }
+
+  // 订单查询（前端 return_url 轮询使用）
+  if (action === 'order-status' && method === 'GET') {
+    const url = new URL(request.url)
+    const outTradeNo = url.searchParams.get('out_trade_no')
+    if (!outTradeNo) {
+      return errorResponse('缺少 out_trade_no', 400)
+    }
+
+    const order = await db.orders.getOrderByOutTradeNo(outTradeNo)
+    if (!order) {
+      return errorResponse('订单不存在', 404)
+    }
+
+    return successResponse({
+      outTradeNo: order.outTradeNo,
+      status: order.status,
+      questionnaireType: order.questionnaireType,
+      linkId: order.linkId || null,
+    })
+  }
+
+  return notFoundResponse('支付路由不存在')
 }
 
 /**

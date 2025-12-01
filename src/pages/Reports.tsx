@@ -223,12 +223,12 @@ export default function Reports() {
         </div>
       </section>
 
-      <section className="card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <section className="card -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 rounded-none sm:rounded-2xl">
+        <div className="overflow-x-auto -mx-4 sm:-mx-6 lg:-mx-8 xl:-mx-8 px-4 sm:px-6 lg:px-8">
+          <table className="w-full text-xs sm:text-sm min-w-[600px]">
             <thead>
-              <tr className="border-b bg-muted text-gray-500">
-                <th className="py-3 px-4 w-12">
+              <tr className="border-b bg-muted text-gray-500 dark:text-gray-400">
+                <th className="py-2 sm:py-3 px-2 sm:px-4 w-8 sm:w-12">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
@@ -236,36 +236,52 @@ export default function Reports() {
                       if (input) input.indeterminate = isIndeterminate
                     }}
                     onChange={e => toggleSelectAll(e.target.checked)}
+                    className="w-3 h-3 sm:w-4 sm:h-4"
                   />
                 </th>
-                <th className="py-3 px-4 text-left">报告ID</th>
-                <th className="py-3 px-4 text-left">问卷类型</th>
-                <th className="py-3 px-4 text-left">总分</th>
-                <th className="py-3 px-4 text-left">完成时间</th>
-                <th className="py-3 px-4 text-left">地点</th>
-                <th className="py-3 px-4 text-left">操作</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">报告ID</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden sm:table-cell">问卷类型</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">总分</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden md:table-cell">完成时间</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left hidden lg:table-cell">地点</th>
+                <th className="py-2 sm:py-3 px-2 sm:px-4 text-left">操作</th>
               </tr>
             </thead>
             <tbody>
               {filteredReports.map(report => {
                 const checked = selected.includes(report.id)
                 return (
-                  <tr key={report.id} className={`border-b hover:bg-gray-50 ${checked ? 'bg-primary-50' : ''}`}>
-                    <td className="py-3 px-4">
-                      <input type="checkbox" checked={checked} onChange={e => toggleSelect(report.id, e.target.checked)} />
+                  <tr key={report.id} className={`border-b hover:bg-gray-50 dark:hover:bg-gray-800/50 ${checked ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`}>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4">
+                      <input 
+                        type="checkbox" 
+                        checked={checked} 
+                        onChange={e => toggleSelect(report.id, e.target.checked)}
+                        className="w-3 h-3 sm:w-4 sm:h-4"
+                      />
                     </td>
-                    <td className="py-3 px-4 font-mono text-xs text-gray-900">{report.id}</td>
-                    <td className="py-3 px-4 text-gray-700">{report.questionnaireType}</td>
-                    <td className="py-3 px-4 text-gray-700 font-semibold">{report.totalScore}</td>
-                    <td className="py-3 px-4 text-gray-600">{formatDate(report.completedAt)}</td>
-                    <td className="py-3 px-4 text-gray-600">{report.location || '-'}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 font-mono text-xs text-gray-900 dark:text-white">{report.id}</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 dark:text-gray-300 hidden sm:table-cell">{report.questionnaireType}</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-700 dark:text-gray-300 font-semibold">{report.totalScore}</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400 hidden md:table-cell text-xs sm:text-sm">
+                      {formatDate(report.completedAt, 'MM-dd HH:mm')}
+                    </td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-600 dark:text-gray-400 hidden lg:table-cell">{report.location || '-'}</td>
+                    <td className="py-2 sm:py-3 px-2 sm:px-4">
                       <div className="flex gap-2">
-                        <button className="text-primary-600 hover:text-primary-700" onClick={() => handleViewReport(report.id)}>
-                          <Eye className="w-4 h-4" />
+                        <button 
+                          className="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 p-1 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded" 
+                          onClick={() => handleViewReport(report.id)}
+                          title="查看报告"
+                        >
+                          <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
-                        <button className="text-danger hover:text-dangerLight" onClick={() => handleDelete(report.id)}>
-                          <Trash2 className="w-4 h-4" />
+                        <button 
+                          className="text-danger hover:text-dangerLight p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded" 
+                          onClick={() => handleDelete(report.id)}
+                          title="删除报告"
+                        >
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </td>
