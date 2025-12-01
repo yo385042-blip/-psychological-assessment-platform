@@ -44,8 +44,6 @@ export default function Payment() {
   // 支付完成后从 return_url 返回时，根据订单状态跳转到测试页面
   useEffect(() => {
     const checkOrder = async () => {
-      // 支持新的 qt 参数和旧的 type 参数（向后兼容）
-      const questionnaireType = searchParams.get('qt') || searchParams.get('type') || ''
       if (result !== 'return' || !orderNo) return
       try {
         const resp = await fetch(`/api/payment/order-status?out_trade_no=${encodeURIComponent(orderNo)}`)
