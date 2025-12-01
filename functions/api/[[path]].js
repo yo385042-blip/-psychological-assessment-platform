@@ -278,6 +278,29 @@ async function handlePaymentRoutes(action, method, request, db, env) {
     key_full_preview: key && typeof key === 'string' && key.length <= 50 ? key : (key ? key.substring(0, 20) + '...' + key.substring(key.length - 10) : 'N/A')
   })
 
+  // 先检查是否为占位符（在检查是否为空之前）
+  if (key && typeof key === 'string' && isPlaceholder) {
+    console.error('❌ 支付配置错误: ZPAY_KEY 是占位符', {
+      key_preview: key.substring(0, 50),
+      detected_placeholder: detectedPlaceholder,
+      key_length: key.length
+    })
+    return errorResponse(
+      `支付配置错误：检测到 ZPAY_KEY 环境变量的值仍然是占位符（检测到：${detectedPlaceholder || '未知占位符'}）。\n\n` +
+      `当前 KEY 值：${key.length > 50 ? key.substring(0, 50) + '...' : key}\n\n` +
+      `请执行以下步骤修复：\n` +
+      `1. 登录 Cloudflare Dashboard → 您的项目 → Settings → Variables\n` +
+      `2. 找到 ZPAY_KEY 变量，检查当前值\n` +
+      `3. 如果值是"商户KEY"等占位符，请删除并更新为易支付后台的真实密钥值\n` +
+      `4. 从易支付后台复制真实密钥：登录 https://zpayz.cn 后查看商户密钥\n` +
+      `5. 粘贴到 ZPAY_KEY 的值中，确保完全一致（通常是32位字母数字组合）\n` +
+      `6. 保存环境变量\n` +
+      `7. ⚠️ 重要：重新部署 Worker（在 Deployments 页面点击最新部署的"重新部署"按钮）\n\n` +
+      `注意：环境变量修改后必须重新部署才能生效！`,
+      500
+    )
+  }
+
   if (!pid || !key) {
     console.error('❌ 支付配置错误: ZPAY_PID 或 ZPAY_KEY 未配置', {
       pid: !!pid,
@@ -295,7 +318,7 @@ async function handlePaymentRoutes(action, method, request, db, env) {
     )
   }
   
-  if (typeof key !== 'string' || key.trim() === '' || isPlaceholder) {
+  if (typeof key !== 'string' || key.trim() === '') {
     console.error('❌ 支付配置错误: ZPAY_KEY 是占位符或无效值', {
       key_type: typeof key,
       key_length: key ? key.length : 0,
