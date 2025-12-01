@@ -245,15 +245,23 @@ async function handlePaymentRoutes(action, method, request, db, env) {
       return errorResponse('缺少必要参数', 400)
     }
 
-    const baseParams = {
-      name,
-      money,
-      type,
-      out_trade_no,
-      notify_url,
-      pid,
-      param,
-      return_url,
+    // 构建签名参数（按易支付要求：ASCII 顺序，不能有空值）
+    const baseParams = {}
+    
+    // 按 ASCII 顺序添加参数（易支付要求参数按字母顺序排序）
+    if (money) baseParams.money = String(money)
+    if (name) baseParams.name = String(name)
+    if (notify_url) baseParams.notify_url = String(notify_url)
+    if (out_trade_no) baseParams.out_trade_no = String(out_trade_no)
+    if (param) baseParams.param = String(param)
+    if (pid) baseParams.pid = String(pid)
+    if (return_url) baseParams.return_url = String(return_url)
+    if (type) baseParams.type = String(type)
+
+    // 验证 KEY 配置
+    if (!key || key.trim() === '' || key.includes('商户KEY') || key.includes('你的')) {
+      console.error('支付配置错误: ZPAY_KEY 配置无效，当前值为:', key ? key.substring(0, 10) + '...' : '未设置')
+      return errorResponse('支付配置错误：商户密钥未正确配置，请检查环境变量 ZPAY_KEY 是否为实际密钥值', 500)
     }
 
     // 创建本地订单（pending）
@@ -266,14 +274,40 @@ async function handlePaymentRoutes(action, method, request, db, env) {
       status: 'pending',
     })
 
+    // 生成签名（签名函数会自动按 ASCII 排序并过滤空值）
     const sign = md5Sign(baseParams, key)
+    
+    // 构建支付 URL
     const url = new URL('https://zpayz.cn/submit.php')
-    Object.entries({
-      ...baseParams,
-      sign,
+    // 添加所有参数（签名函数已确保参数正确）
+    Object.entries(baseParams).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        url.searchParams.set(k, String(v))
+      }
+    })
+    url.searchParams.set('sign', sign)
+    url.searchParams.set('sign_type', 'MD5')
+    
+    // 调试日志（不输出敏感信息）
+    console.log('支付参数:', {
+      money: baseParams.money,
+      name: baseParams.name,
+      out_trade_no: baseParams.out_trade_no,
+      pid: baseParams.pid,
+      type: baseParams.type,
+      key_length: key ? key.length : 0,
+      key_valid: key && !key.includes('商户KEY') && !key.includes('你的')
+    })
+    
+    // 调试日志（不输出敏感信息）
+    console.log('支付参数:', {
+      money: baseParams.money,
+      name: baseParams.name,
+      out_trade_no: baseParams.out_trade_no,
+      pid: baseParams.pid ? '已设置' : '未设置',
+      type: baseParams.type,
       sign_type: 'MD5',
-    }).forEach(([k, v]) => {
-      url.searchParams.set(k, String(v))
+      key_length: key ? key.length : 0
     })
 
     return successResponse({
