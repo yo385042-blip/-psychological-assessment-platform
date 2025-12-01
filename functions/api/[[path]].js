@@ -55,7 +55,13 @@ export async function onRequest(context) {
   const { request, env, params } = context
   const { path } = params || {}
   const url = new URL(request.url)
-  const pathSegments = (path || '').split('/').filter(Boolean)
+
+  // 在 Pages Functions 中，[[path]] 参数在某些版本/场景下可能是字符串或数组
+  // 为避免运行时错误，这里统一规范化为字符串
+  const rawPath =
+    Array.isArray(path) ? path.join('/') : typeof path === 'string' ? path : ''
+
+  const pathSegments = rawPath.split('/').filter(Boolean)
   const method = request.method
 
   const db = getDB(context)
