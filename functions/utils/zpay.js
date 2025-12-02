@@ -23,15 +23,13 @@ export function generateSign(params, key = MERCHANT_KEY) {
     }
   }
 
-  // 2. 按参数名ASCII码从小到大排序
-  const sortedKeys = Object.keys(filteredParams).sort()
-
-  // 3. 拼接成字符串（key=value&key=value格式）
-  const signString = sortedKeys
-    .map(k => `${k}=${filteredParams[k]}`)
+  // 2. 按「参数原始顺序」拼接成字符串（key=value&key=value 格式）
+  //    这里不再做键名排序，以严格贴合 zpay 返回的“请检查签名字符串”示例
+  const signString = Object.entries(filteredParams)
+    .map(([k, v]) => `${k}=${v}`)
     .join('&')
 
-  // 4. 在末尾加上商户密钥
+  // 3. 在末尾加上商户密钥（注意：是直接拼接 key，而不是再加 & 或 key=）
   const finalString = signString + key
 
   // 5. 进行MD5加密（使用Web Crypto API）
