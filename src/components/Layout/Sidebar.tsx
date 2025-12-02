@@ -16,6 +16,10 @@ import {
 import { clsx } from 'clsx'
 import { useAuth } from '@/contexts/AuthContext'
 
+type SidebarProps = {
+  onClose?: () => void
+}
+
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: '仪表盘' },
   { path: '/links/generate', icon: LinkIcon, label: '生成链接' },
@@ -33,9 +37,15 @@ const navItems = [
   { path: '/admin/backup', icon: Database, label: '数据备份', roles: ['admin'] as Array<'admin' | 'user'> },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }: SidebarProps) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+
+  const handleNavClick = () => {
+    if (onClose) {
+      onClose()
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -92,6 +102,7 @@ export default function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={handleNavClick}
               className={({ isActive }) =>
                 clsx(
                   'flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all',
@@ -111,6 +122,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-white/10">
         <NavLink
           to="/profile"
+          onClick={handleNavClick}
           className={({ isActive }) =>
             clsx(
               'flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all',
@@ -124,7 +136,10 @@ export default function Sidebar() {
           <span>个人设置</span>
         </NavLink>
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            handleLogout()
+            handleNavClick()
+          }}
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/90 hover:bg-white/10 transition-colors w-full"
         >
           <LogOut className="w-5 h-5" />
