@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type React from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogIn, Lock, User, AlertCircle } from 'lucide-react'
+import { LogIn, Lock, User, AlertCircle, Home, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function Login() {
@@ -9,12 +9,37 @@ export default function Login() {
   const { login, isLoading } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // 生成验证码
+  const captcha = useMemo(() => {
+    const num1 = Math.floor(Math.random() * 10) + 1
+    const num2 = Math.floor(Math.random() * 10) + 1
+    return { num1, num2, answer: num1 + num2 }
+  }, [])
+  
+  const [currentCaptcha, setCurrentCaptcha] = useState(captcha)
+  
+  const refreshCaptcha = () => {
+    const num1 = Math.floor(Math.random() * 10) + 1
+    const num2 = Math.floor(Math.random() * 10) + 1
+    setCurrentCaptcha({ num1, num2, answer: num1 + num2 })
+    setCaptchaAnswer('')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    
+    // 验证验证码
+    if (parseInt(captchaAnswer) !== currentCaptcha.answer) {
+      setError('验证码错误，请重新输入')
+      refreshCaptcha()
+      return
+    }
+    
     setIsSubmitting(true)
 
     const result = await login(username, password)
@@ -24,6 +49,7 @@ export default function Login() {
       navigate('/dashboard')
     } else {
       setError(result.message || '登录失败，请稍后重试')
+      refreshCaptcha()
     }
   }
 
@@ -91,6 +117,38 @@ export default function Login() {
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                验证码
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    className="input"
+                    placeholder="计算结果"
+                    required
+                    disabled={isSubmitting || isLoading}
+                  />
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg">
+                  <span className="text-gray-700 font-medium">
+                    {currentCaptcha.num1} + {currentCaptcha.num2} =
+                  </span>
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                    disabled={isSubmitting || isLoading}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <label className="flex items-center">
                 <input
@@ -126,11 +184,20 @@ export default function Login() {
         </div>
 
         {/* 辅助链接 */}
-        <div className="text-center text-sm text-gray-600 mt-6">
-          还没有账号？
-          <Link to="/register" className="text-secondary-600 hover:underline ml-1">
-            立即注册
+        <div className="mt-6 space-y-3">
+          <Link
+            to="/"
+            className="flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors"
+          >
+            <Home className="w-4 h-4" />
+            <span>回到主页</span>
           </Link>
+          <div className="text-center text-sm text-gray-600">
+            还没有账号？
+            <Link to="/register" className="text-secondary-600 hover:underline ml-1">
+              立即注册
+            </Link>
+          </div>
         </div>
 
         {/* 页脚 */}

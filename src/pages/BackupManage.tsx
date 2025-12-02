@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Download, Upload, Trash2, RefreshCw, Database, Clock, HardDrive } from 'lucide-react'
+import { Download, Upload, Trash2, RefreshCw, Database, Clock, HardDrive, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -19,12 +19,15 @@ import {
 import { formatDate, formatFileSize } from '@/utils/formatters'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { addAuditLog } from '@/utils/audit'
+import { checkAllData, exportAllData, downloadDataReport, DataCheckResult } from '@/utils/dataRecovery'
 
 export default function BackupManage() {
   const { user } = useAuth()
   const [backups, setBackups] = useState<BackupData[]>([])
   const [backupName, setBackupName] = useState('')
   const [backupDescription, setBackupDescription] = useState('')
+  const [dataCheckResults, setDataCheckResults] = useState<DataCheckResult[]>([])
+  const [showDataCheck, setShowDataCheck] = useState(false)
   const { showConfirm, showAlert, DialogComponent } = useConfirmDialog()
 
   if (!user || user.role !== 'admin') {
@@ -34,6 +37,30 @@ export default function BackupManage() {
   const refreshBackups = useCallback(() => {
     setBackups(loadBackups())
   }, [])
+
+  const handleCheckData = useCallback(() => {
+    const results = checkAllData()
+    setDataCheckResults(results)
+    setShowDataCheck(true)
+  }, [])
+
+  const handleExportAllData = useCallback(() => {
+    try {
+      const json = exportAllData()
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `all-data-backup_${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      showAlert('导出成功', '所有数据已导出为JSON文件', 'success')
+    } catch (error) {
+      showAlert('导出失败', error instanceof Error ? error.message : '导出过程中出现错误', 'alert')
+    }
+  }, [showAlert])
 
   useEffect(() => {
     refreshBackups()
@@ -152,6 +179,83 @@ export default function BackupManage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">数据备份管理</h1>
         <p className="text-gray-600 mt-2">创建、管理和恢复系统数据备份</p>
+      </div>
+
+      {/* 数据检查 */}
+      <div className="card bg-yellow-50 border-yellow-200">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xl font-semibold mb-2 flex items-center gap-2 text-yellow-900">
+              <AlertCircle className="w-5 h-5 text-yellow-600" />
+              数据检查工具
+            </h2>
+            <p className="text-sm text-yellow-800">检查数据是否丢失，导出所有数据进行备份</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleCheckData}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4" />
+              检查数据
+            </button>
+            <button
+              onClick={handleExportAllData}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              导出所有数据
+            </button>
+            <button
+              onClick={downloadDataReport}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              下载检查报告
+            </button>
+          </div>
+        </div>
+
+        {showDataCheck && dataCheckResults.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="text-sm font-semibold text-yellow-900 mb-2">数据检查结果：</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {dataCheckResults.map((result) => (
+                <div
+                  key={result.key}
+                  className={`p-3 rounded-lg border ${
+                    result.exists
+                      ? 'bg-green-50 border-green-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {result.exists ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      )}
+                      <span className="text-sm font-medium text-gray-900">{result.key}</span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {result.exists ? (
+                        <>
+                          {result.itemCount !== undefined ? `${result.itemCount} 项` : '有数据'} • {formatFileSize(result.size)}
+                        </>
+                      ) : (
+                        '无数据'
+                      )}
+                    </div>
+                  </div>
+                  {result.error && (
+                    <div className="text-xs text-red-600 mt-1">错误: {result.error}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 创建备份 */}

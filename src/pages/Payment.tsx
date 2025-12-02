@@ -53,7 +53,7 @@ export default function Payment() {
     }
   }
 
-  const handlePayment = async (type: 'alipay' | 'wxpay' = 'alipay') => {
+  const handlePayment = async () => {
     if (!questionnaireType) {
       toast.error('请选择问卷类型')
       return
@@ -64,7 +64,7 @@ export default function Payment() {
       const response = await apiClient.post('/payment/create', {
         questionnaireType,
         money: 1,
-        type,
+        type: 'alipay', // 仅支持支付宝
       })
 
       if (response.success && response.data?.paymentUrl) {
@@ -189,9 +189,9 @@ export default function Payment() {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div>
           <button
-            onClick={() => handlePayment('alipay')}
+            onClick={handlePayment}
             disabled={loading || !questionnaireType}
             className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
@@ -204,24 +204,6 @@ export default function Payment() {
               <>
                 <CreditCard className="w-5 h-5" />
                 支付宝支付
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={() => handlePayment('wxpay')}
-            disabled={loading || !questionnaireType}
-            className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                处理中...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5" />
-                微信支付
               </>
             )}
           </button>
