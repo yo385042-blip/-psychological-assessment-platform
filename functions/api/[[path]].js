@@ -53,7 +53,14 @@ export async function onRequest(context) {
   const { request, env, params } = context
   const { path } = params || {}
   const url = new URL(request.url)
-  const pathSegments = (path || '').split('/').filter(Boolean)
+  // Cloudflare Pages Functions 中，params.path 可能是字符串，也可能是数组
+  // 这里做一次归一化，避免直接对数组调用 split 抛异常
+  const normalizedPath = Array.isArray(path)
+    ? path.join('/')
+    : typeof path === 'string'
+      ? path
+      : ''
+  const pathSegments = normalizedPath.split('/').filter(Boolean)
   const method = request.method
 
   const db = getDB(context)
