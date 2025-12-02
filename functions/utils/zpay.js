@@ -6,7 +6,7 @@
 // 支付网关配置（注意：必须是提交地址 submit.php，而不是站点首页）
 const PAYMENT_GATEWAY = 'https://zpayz.cn/submit.php'
 const MERCHANT_PID = '2025120114591699'
-const MERCHANT_KEY = '9wkw39Fq1x9TZfhk5L8bvsU5Djc1zq2t'
+const MERCHANT_KEY = '7H1J0p9RTkZaq66zLHIpoTGlifNI7y1Z'
 
 /**
  * 生成MD5签名
@@ -30,13 +30,13 @@ export function generateSign(params, key = MERCHANT_KEY) {
     .map(k => `${k}=${filteredParams[k]}`)
     .join('&')
 
-  // 3. 在末尾按易支付规范加上 &key=商户密钥
-  const finalString = `${signString}&key=${key}`
+  // 3. 在末尾直接拼接商户密钥（兼容易支付规范：a=b&c=d&e=f + KEY）
+  const finalString = signString + key
 
   // 调试：在 Cloudflare 日志中打印网关用于提示的签名字符串格式（不包含真实密钥值）
   try {
-    // 这里打印的是：参数串 + &key=商户KEY 占位，方便与网关报错里的字符串一一对比
-    console.log('ZPAY_SIGN_STRING_FOR_CHECK:', `${signString}&key=商户KEY`)
+    // 这里打印的是：参数串 + 商户KEY 占位，方便与网关报错里的字符串一一对比
+    console.log('ZPAY_SIGN_STRING_FOR_CHECK:', signString + '商户KEY')
   } catch (e) {
     // ignore
   }
