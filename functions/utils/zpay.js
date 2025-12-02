@@ -3,8 +3,8 @@
  * 网关：https://zpayz.cn/
  */
 
-// 支付网关配置
-const PAYMENT_GATEWAY = 'https://zpayz.cn/'
+// 支付网关配置（注意：必须是提交地址 submit.php，而不是站点首页）
+const PAYMENT_GATEWAY = 'https://zpayz.cn/submit.php'
 const MERCHANT_PID = '2025120114591699'
 const MERCHANT_KEY = '9wkw39Fq1x9TZfhk5L8bvsU5Djc1zq2t'
 
