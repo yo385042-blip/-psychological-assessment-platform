@@ -84,7 +84,7 @@ export function verifySign(params, key = MERCHANT_KEY) {
  */
 export function generatePaymentUrl(paymentData) {
   // 构建支付参数（注意：sign和sign_type不参与签名）
-  const params = {
+  const baseParams = {
     money: paymentData.money,
     name: paymentData.name,
     notify_url: paymentData.notify_url,
@@ -95,20 +95,26 @@ export function generatePaymentUrl(paymentData) {
     type: paymentData.type || 'alipay',
   }
 
-  // 生成签名（只对非空参数进行签名，不包括sign和sign_type）
-  const sign = generateSign(params)
-  
-  // 添加签名和签名类型
-  params.sign = sign
-  params.sign_type = 'MD5'
+  // 生成签名
+  const sign = generateSign(baseParams)
+
+  const signedParams = {
+    ...baseParams,
+    sign,
+    sign_type: 'MD5',
+  }
 
   // 构建URL（按字母顺序排序，确保一致性）
-  const sortedKeys = Object.keys(params).sort()
+  const sortedKeys = Object.keys(signedParams).sort()
   const queryString = sortedKeys
-    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(signedParams[k])}`)
     .join('&')
 
-  return `${PAYMENT_GATEWAY}?${queryString}`
+  return {
+    url: `${PAYMENT_GATEWAY}?${queryString}`,
+    params: signedParams,
+    sign,
+  }
 }
 
 /**

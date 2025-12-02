@@ -1102,7 +1102,7 @@ async function handlePaymentRoutes(action, rest, method, request, db, userId, re
     })
 
     // 生成支付URL
-    const paymentUrl = generatePaymentUrl({
+    const paymentRequest = generatePaymentUrl({
       money: money.toString(),
       name,
       out_trade_no: outTradeNo,
@@ -1115,7 +1115,9 @@ async function handlePaymentRoutes(action, rest, method, request, db, userId, re
     return successResponse({
       orderId: order.id,
       outTradeNo: order.outTradeNo,
-      paymentUrl,
+      paymentUrl: paymentRequest.url,
+      paymentSign: paymentRequest.sign,
+      paymentParams: paymentRequest.params,
       order,
     })
   }
