@@ -23,16 +23,25 @@ export function generateSign(params, key = MERCHANT_KEY) {
     }
   }
 
-  // 2. 按「参数原始顺序」拼接成字符串（key=value&key=value 格式）
-  //    这里不再做键名排序，以严格贴合 zpay 返回的“请检查签名字符串”示例
-  const signString = Object.entries(filteredParams)
-    .map(([k, v]) => `${k}=${v}`)
+  // 2. 按参数名 ASCII 从小到大排序后，拼接成字符串（key=value&key=value 格式）
+  //    这一点与易支付类网关的 PHP 示例保持一致
+  const sortedKeys = Object.keys(filteredParams).sort()
+  const signString = sortedKeys
+    .map(k => `${k}=${filteredParams[k]}`)
     .join('&')
 
   // 3. 在末尾加上商户密钥（注意：是直接拼接 key，而不是再加 & 或 key=）
   const finalString = signString + key
 
-  // 5. 进行MD5加密（使用Web Crypto API）
+  // 调试：在 Cloudflare 日志中打印网关用于提示的签名字符串格式（不包含真实密钥值）
+  try {
+    // 这里打印的是：参数串 + “商户KEY” 占位，方便与网关报错里的字符串一一对比
+    console.log('ZPAY_SIGN_STRING_FOR_CHECK:', signString + '商户KEY')
+  } catch (e) {
+    // ignore
+  }
+
+  // 4. 进行 MD5 加密（标准实现，按 UTF-8 编码）
   return md5(finalString)
 }
 
@@ -94,155 +103,181 @@ export function generatePaymentUrl(paymentData) {
 }
 
 /**
- * MD5加密函数（纯JavaScript实现）
- * @param {string} str - 要加密的字符串
- * @returns {string} MD5哈希值（32位十六进制字符串）
+ * 标准 MD5 实现（UTF-8）
+ * 说明：实现参考经典 JavaScript MD5 实现，确保与 PHP md5() 结果一致
+ * @param {string} str
+ * @returns {string} 32 位小写十六进制 MD5
  */
 function md5(str) {
-  // MD5算法的完整实现
-  function md5cycle(x, k) {
-    let a = x[0], b = x[1], c = x[2], d = x[3]
-
-    a = ff(a, b, c, d, k[0], 7, -680876936)
-    d = ff(d, a, b, c, k[1], 12, -389564586)
-    c = ff(c, d, a, b, k[2], 17, 606105819)
-    b = ff(b, c, d, a, k[3], 22, -1044525330)
-    a = ff(a, b, c, d, k[4], 7, -176418897)
-    d = ff(d, a, b, c, k[5], 12, 1200080426)
-    c = ff(c, d, a, b, k[6], 17, -1473231341)
-    b = ff(b, c, d, a, k[7], 22, -45705983)
-    a = ff(a, b, c, d, k[8], 7, 1770035416)
-    d = ff(d, a, b, c, k[9], 12, -1958414417)
-    c = ff(c, d, a, b, k[10], 17, -42063)
-    b = ff(b, c, d, a, k[11], 22, -1990404162)
-    a = ff(a, b, c, d, k[12], 7, 1804603682)
-    d = ff(d, a, b, c, k[13], 12, -40341101)
-    c = ff(c, d, a, b, k[14], 17, -1502002290)
-    b = ff(b, c, d, a, k[15], 22, 1236535329)
-
-    a = gg(a, b, c, d, k[1], 5, -165796510)
-    d = gg(d, a, b, c, k[6], 9, -1069501632)
-    c = gg(c, d, a, b, k[11], 14, 643717713)
-    b = gg(b, c, d, a, k[0], 20, -373897302)
-    a = gg(a, b, c, d, k[5], 5, -701558691)
-    d = gg(d, a, b, c, k[10], 9, 38016083)
-    c = gg(c, d, a, b, k[15], 14, -660478335)
-    b = gg(b, c, d, a, k[4], 20, -405537848)
-    a = gg(a, b, c, d, k[9], 5, 568446438)
-    d = gg(d, a, b, c, k[14], 9, -1019803690)
-    c = gg(c, d, a, b, k[3], 14, -187363961)
-    b = gg(b, c, d, a, k[8], 20, 1163531501)
-    a = gg(a, b, c, d, k[13], 5, -1444681467)
-    d = gg(d, a, b, c, k[2], 9, -51403784)
-    c = gg(c, d, a, b, k[7], 14, 1735328473)
-    b = gg(b, c, d, a, k[12], 20, -1926607734)
-
-    a = hh(a, b, c, d, k[5], 4, -378558)
-    d = hh(d, a, b, c, k[8], 11, -2022574463)
-    c = hh(c, d, a, b, k[11], 16, 1839030562)
-    b = hh(b, c, d, a, k[14], 23, -35309556)
-    a = hh(a, b, c, d, k[1], 4, -1530992060)
-    d = hh(d, a, b, c, k[4], 11, 1272893353)
-    c = hh(c, d, a, b, k[7], 16, -155497632)
-    b = hh(b, c, d, a, k[10], 23, -1094730640)
-    a = hh(a, b, c, d, k[13], 4, 681279174)
-    d = hh(d, a, b, c, k[0], 11, -358537222)
-    c = hh(c, d, a, b, k[3], 16, -722521979)
-    b = hh(b, c, d, a, k[6], 23, 76029189)
-    a = hh(a, b, c, d, k[9], 4, -640364487)
-    d = hh(d, a, b, c, k[12], 11, -421815835)
-    c = hh(c, d, a, b, k[15], 16, 530742520)
-    b = hh(b, c, d, a, k[2], 23, -995338651)
-
-    a = ii(a, b, c, d, k[0], 6, -198630844)
-    d = ii(d, a, b, c, k[7], 10, 1126891415)
-    c = ii(c, d, a, b, k[14], 15, -1416354905)
-    b = ii(b, c, d, a, k[5], 21, -57434055)
-    a = ii(a, b, c, d, k[12], 6, 1700485571)
-    d = ii(d, a, b, c, k[3], 10, -1894986606)
-    c = ii(c, d, a, b, k[10], 15, -1051523)
-    b = ii(b, c, d, a, k[1], 21, -2054922799)
-    a = ii(a, b, c, d, k[8], 6, 1873313359)
-    d = ii(d, a, b, c, k[15], 10, -30611744)
-    c = ii(c, d, a, b, k[6], 15, -1560198380)
-    b = ii(b, c, d, a, k[13], 21, 1309151649)
-    a = ii(a, b, c, d, k[4], 6, -145523070)
-    d = ii(d, a, b, c, k[11], 10, -1120210379)
-    c = ii(c, d, a, b, k[2], 15, 718787259)
-    b = ii(b, c, d, a, k[9], 21, -343485551)
-
-    x[0] = add32(a, x[0])
-    x[1] = add32(b, x[1])
-    x[2] = add32(c, x[2])
-    x[3] = add32(d, x[3])
+  // UTF-8 编码
+  function utf8Encode(string) {
+    return unescape(encodeURIComponent(string))
   }
 
-  function cmn(q, a, b, x, s, t) {
-    a = add32(add32(a, q), add32(x, t))
-    return add32((a << s) | (a >>> (32 - s)), b)
+  function rotateLeft(lValue, iShiftBits) {
+    return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits))
   }
 
-  function ff(a, b, c, d, x, s, t) {
-    return cmn((b & c) | ((~b) & d), a, b, x, s, t)
-  }
-
-  function gg(a, b, c, d, x, s, t) {
-    return cmn((b & d) | (c & (~d)), a, b, x, s, t)
-  }
-
-  function hh(a, b, c, d, x, s, t) {
-    return cmn(b ^ c ^ d, a, b, x, s, t)
-  }
-
-  function ii(a, b, c, d, x, s, t) {
-    return cmn(c ^ (b | (~d)), a, b, x, s, t)
-  }
-
-  function add32(a, b) {
-    return (a + b) & 0xFFFFFFFF
-  }
-
-  function rhex(n) {
-    let s = ''
-    const hexChr = '0123456789abcdef'
-    for (let i = 0; i < 4; i++) {
-      s += hexChr.charAt((n >> (i * 8 + 4)) & 0x0F) + hexChr.charAt((n >> (i * 8)) & 0x0F)
+  function addUnsigned(lX, lY) {
+    const lX4 = lX & 0x40000000
+    const lY4 = lY & 0x40000000
+    const lX8 = lX & 0x80000000
+    const lY8 = lY & 0x80000000
+    const lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF)
+    if (lX4 & lY4) {
+      return (lResult ^ 0x80000000 ^ lX8 ^ lY8)
     }
-    return s
-  }
-
-  const utf8 = unescape(encodeURIComponent(str))
-  const x = []
-  let k
-
-  for (let i = 0; i < utf8.length; i++) {
-    x[i >> 2] |= (utf8.charCodeAt(i) << ((i % 4) * 8))
-  }
-
-  x[utf8.length >> 2] |= 0x80 << (((utf8.length % 4) * 8) + 4)
-  x[(((utf8.length + 64) >>> 9) << 4) + 14] = utf8.length * 8
-
-  const h = [1732584193, -271733879, -1732584194, 271733878]
-
-  for (let i = 0; i < x.length; i += 16) {
-    const olda = h[0], oldb = h[1], oldc = h[2], oldd = h[3]
-    h[0] = olda
-    h[1] = oldb
-    h[2] = oldc
-    h[3] = oldd
-
-    k = []
-    for (let j = 0; j < 16; j++) {
-      k[j] = x[i + j]
+    if (lX4 | lY4) {
+      if (lResult & 0x40000000) {
+        return (lResult ^ 0xC0000000 ^ lX8 ^ lY8)
+      } else {
+        return (lResult ^ 0x40000000 ^ lX8 ^ lY8)
+      }
     }
-
-    md5cycle(h, k)
-
-    h[0] = add32(h[0], olda)
-    h[1] = add32(h[1], oldb)
-    h[2] = add32(h[2], oldc)
-    h[3] = add32(h[3], oldd)
+    return (lResult ^ lX8 ^ lY8)
   }
 
-  return rhex(h[0]) + rhex(h[1]) + rhex(h[2]) + rhex(h[3])
+  function F(x, y, z) { return (x & y) | ((~x) & z) }
+  function G(x, y, z) { return (x & z) | (y & (~z)) }
+  function H(x, y, z) { return x ^ y ^ z }
+  function I(x, y, z) { return y ^ (x | (~z)) }
+
+  function FF(a, b, c, d, x, s, ac) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac))
+    return addUnsigned(rotateLeft(a, s), b)
+  }
+
+  function GG(a, b, c, d, x, s, ac) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac))
+    return addUnsigned(rotateLeft(a, s), b)
+  }
+
+  function HH(a, b, c, d, x, s, ac) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac))
+    return addUnsigned(rotateLeft(a, s), b)
+  }
+
+  function II(a, b, c, d, x, s, ac) {
+    a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac))
+    return addUnsigned(rotateLeft(a, s), b)
+  }
+
+  function convertToWordArray(str) {
+    const lWordArray = []
+    let lMessageLength = str.length
+    let lNumberOfWordsTempOne = lMessageLength + 8
+    let lNumberOfWordsTempTwo = (lNumberOfWordsTempOne - (lNumberOfWordsTempOne % 64)) / 64
+    const lNumberOfWords = (lNumberOfWordsTempTwo + 1) * 16
+    let lBytePosition = 0
+    let lByteCount = 0
+    while (lByteCount < lMessageLength) {
+      const lWordCount = (lByteCount - (lByteCount % 4)) / 4
+      lBytePosition = (lByteCount % 4) * 8
+      lWordArray[lWordCount] = (lWordArray[lWordCount] | (str.charCodeAt(lByteCount) << lBytePosition)) >>> 0
+      lByteCount++
+    }
+    const lWordCount = (lByteCount - (lByteCount % 4)) / 4
+    lBytePosition = (lByteCount % 4) * 8
+    lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition)
+    lWordArray[lNumberOfWords - 2] = (lMessageLength << 3) >>> 0
+    lWordArray[lNumberOfWords - 1] = (lMessageLength >>> 29) >>> 0
+    return lWordArray
+  }
+
+  function wordToHex(lValue) {
+    let wordToHexValue = ''
+    for (let lCount = 0; lCount <= 3; lCount++) {
+      const lByte = (lValue >>> (lCount * 8)) & 255
+      const wordToHexValueTemp = '0' + lByte.toString(16)
+      wordToHexValue += wordToHexValueTemp.substr(wordToHexValueTemp.length - 2, 2)
+    }
+    return wordToHexValue
+  }
+
+  // 主流程
+  const x = convertToWordArray(utf8Encode(str))
+
+  let a = 0x67452301
+  let b = 0xEFCDAB89
+  let c = 0x98BADCFE
+  let d = 0x10325476
+
+  for (let k = 0; k < x.length; k += 16) {
+    const AA = a
+    const BB = b
+    const CC = c
+    const DD = d
+
+    a = FF(a, b, c, d, x[k + 0], 7, 0xD76AA478)
+    d = FF(d, a, b, c, x[k + 1], 12, 0xE8C7B756)
+    c = FF(c, d, a, b, x[k + 2], 17, 0x242070DB)
+    b = FF(b, c, d, a, x[k + 3], 22, 0xC1BDCEEE)
+    a = FF(a, b, c, d, x[k + 4], 7, 0xF57C0FAF)
+    d = FF(d, a, b, c, x[k + 5], 12, 0x4787C62A)
+    c = FF(c, d, a, b, x[k + 6], 17, 0xA8304613)
+    b = FF(b, c, d, a, x[k + 7], 22, 0xFD469501)
+    a = FF(a, b, c, d, x[k + 8], 7, 0x698098D8)
+    d = FF(d, a, b, c, x[k + 9], 12, 0x8B44F7AF)
+    c = FF(c, d, a, b, x[k + 10], 17, 0xFFFF5BB1)
+    b = FF(b, c, d, a, x[k + 11], 22, 0x895CD7BE)
+    a = FF(a, b, c, d, x[k + 12], 7, 0x6B901122)
+    d = FF(d, a, b, c, x[k + 13], 12, 0xFD987193)
+    c = FF(c, d, a, b, x[k + 14], 17, 0xA679438E)
+    b = FF(b, c, d, a, x[k + 15], 22, 0x49B40821)
+
+    a = GG(a, b, c, d, x[k + 1], 5, 0xF61E2562)
+    d = GG(d, a, b, c, x[k + 6], 9, 0xC040B340)
+    c = GG(c, d, a, b, x[k + 11], 14, 0x265E5A51)
+    b = GG(b, c, d, a, x[k + 0], 20, 0xE9B6C7AA)
+    a = GG(a, b, c, d, x[k + 5], 5, 0xD62F105D)
+    d = GG(d, a, b, c, x[k + 10], 9, 0x2441453)
+    c = GG(c, d, a, b, x[k + 15], 14, 0xD8A1E681)
+    b = GG(b, c, d, a, x[k + 4], 20, 0xE7D3FBC8)
+    a = GG(a, b, c, d, x[k + 9], 5, 0x21E1CDE6)
+    d = GG(d, a, b, c, x[k + 14], 9, 0xC33707D6)
+    c = GG(c, d, a, b, x[k + 3], 14, 0xF4D50D87)
+    b = GG(b, c, d, a, x[k + 8], 20, 0x455A14ED)
+    a = GG(a, b, c, d, x[k + 13], 5, 0xA9E3E905)
+    d = GG(d, a, b, c, x[k + 2], 9, 0xFCEFA3F8)
+    c = GG(c, d, a, b, x[k + 7], 14, 0x676F02D9)
+    b = GG(b, c, d, a, x[k + 12], 20, 0x8D2A4C8A)
+
+    a = HH(a, b, c, d, x[k + 5], 4, 0xFFFA3942)
+    d = HH(d, a, b, c, x[k + 8], 11, 0x8771F681)
+    c = HH(c, d, a, b, x[k + 11], 16, 0x6D9D6122)
+    b = HH(b, c, d, a, x[k + 14], 23, 0xFDE5380C)
+    a = HH(a, b, c, d, x[k + 1], 4, 0xA4BEEA44)
+    d = HH(d, a, b, c, x[k + 4], 11, 0x4BDECFA9)
+    c = HH(c, d, a, b, x[k + 7], 16, 0xF6BB4B60)
+    b = HH(b, c, d, a, x[k + 10], 23, 0xBEBFBC70)
+    a = HH(a, b, c, d, x[k + 13], 4, 0x289B7EC6)
+    d = HH(d, a, b, c, x[k + 0], 11, 0xEAA127FA)
+    c = HH(c, d, a, b, x[k + 3], 16, 0xD4EF3085)
+    b = HH(b, c, d, a, x[k + 6], 23, 0x04881D05)
+    a = HH(a, b, c, d, x[k + 9], 4, 0xD9D4D039)
+    d = HH(d, a, b, c, x[k + 12], 11, 0xE6DB99E5)
+    c = HH(c, d, a, b, x[k + 15], 16, 0x1FA27CF8)
+    b = HH(b, c, d, a, x[k + 2], 23, 0xC4AC5665)
+
+    a = II(a, b, c, d, x[k + 0], 6, 0xF4292244)
+    d = II(d, a, b, c, x[k + 7], 10, 0x432AFF97)
+    c = II(c, d, a, b, x[k + 14], 15, 0xAB9423A7)
+    b = II(b, c, d, a, x[k + 5], 21, 0xFC93A039)
+    a = II(a, b, c, d, x[k + 12], 6, 0x655B59C3)
+    d = II(d, a, b, c, x[k + 3], 10, 0x8F0CCC92)
+    c = II(c, d, a, b, x[k + 10], 15, 0xFFEFF47D)
+    b = II(b, c, d, a, x[k + 1], 21, 0x85845DD1)
+    a = II(a, b, c, d, x[k + 8], 6, 0x6FA87E4F)
+    d = II(d, a, b, c, x[k + 15], 10, 0xFE2CE6E0)
+    c = II(c, d, a, b, x[k + 6], 15, 0xA3014314)
+    b = II(b, c, d, a, x[k + 13], 21, 0x4E0811A1)
+
+    a = addUnsigned(a, AA)
+    b = addUnsigned(b, BB)
+    c = addUnsigned(c, CC)
+    d = addUnsigned(d, DD)
+  }
+
+  const result = wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)
+  return result.toLowerCase()
 }
