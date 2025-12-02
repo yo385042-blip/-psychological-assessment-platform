@@ -58,7 +58,12 @@ export async function onRequest(context) {
   const { request, env, params } = context
   const { path } = params || {}
   const url = new URL(request.url)
-  const pathSegments = (path || '').split('/').filter(Boolean)
+  const normalizedPath = Array.isArray(path)
+    ? path.join('/')
+    : typeof path === 'string'
+      ? path
+      : ''
+  const pathSegments = normalizedPath.split('/').filter(Boolean)
   const method = request.method
 
   const db = getDB(context)
