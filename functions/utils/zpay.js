@@ -30,13 +30,13 @@ export function generateSign(params, key = MERCHANT_KEY) {
     .map(k => `${k}=${filteredParams[k]}`)
     .join('&')
 
-  // 3. 在末尾加上商户密钥（注意：是直接拼接 key，而不是再加 & 或 key=）
-  const finalString = signString + key
+  // 3. 在末尾按易支付规范加上 &key=商户密钥
+  const finalString = `${signString}&key=${key}`
 
   // 调试：在 Cloudflare 日志中打印网关用于提示的签名字符串格式（不包含真实密钥值）
   try {
-    // 这里打印的是：参数串 + “商户KEY” 占位，方便与网关报错里的字符串一一对比
-    console.log('ZPAY_SIGN_STRING_FOR_CHECK:', signString + '商户KEY')
+    // 这里打印的是：参数串 + &key=商户KEY 占位，方便与网关报错里的字符串一一对比
+    console.log('ZPAY_SIGN_STRING_FOR_CHECK:', `${signString}&key=商户KEY`)
   } catch (e) {
     // ignore
   }
