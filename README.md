@@ -84,54 +84,8 @@ src/
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
-## 🚀 部署
-
-### 方式1：通过 GitHub 自动部署（推荐）
-
-详细说明请参考 [GitHub部署指南.md](GitHub部署指南.md)
-
-**快速步骤：**
-```powershell
-# 1. 提交并推送代码
-git add .
-git commit -m "部署更新"
-git push origin main
-
-# 2. 在 Cloudflare Dashboard 中配置 GitHub 连接
-# 3. 每次推送代码会自动触发部署
-```
-
-**或使用脚本：**
-```powershell
-.\deploy-github.ps1
-```
-
-### 方式2：使用 Wrangler CLI 手动部署
-
-详细说明请参考 [部署指南.md](部署指南.md)
-
-**快速步骤：**
-```powershell
-# 1. 构建项目
-npm run build
-
-# 2. 部署
-wrangler pages deploy dist
-```
-
-**或使用脚本：**
-```powershell
-.\deploy.ps1
-```
-
-### 配置 KV 绑定
-
-1. 在 Cloudflare Dashboard 中创建 KV Namespace
-2. 在 Pages 项目设置中绑定 KV（变量名：`DB`）
-
 ## 📝 注意事项
 
 - 所有测试链接为一次性使用，使用后自动失效
 - 新注册用户需要管理员审核后才能登录
 - 题目导入后需要手动上架才能在"生成链接"页面使用
-- 部署前确保 `functions/` 目录在项目根目录

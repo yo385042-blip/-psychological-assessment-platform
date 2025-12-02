@@ -6,8 +6,7 @@
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '../utils/response.js'
 import { verifyAuth, requireAdmin, hashPassword, verifyPassword } from '../utils/auth.js'
 import { generateToken } from '../utils/jwt.js'
-import { UserDB, LinkDB, QuestionnaireDB, NotificationDB, OrderDB, SessionDB } from '../utils/db.js'
-import { generatePaymentUrl, verifySign } from '../utils/zpay.js'
+import { UserDB, LinkDB, QuestionnaireDB, NotificationDB } from '../utils/db.js'
 
 // 初始化数据库实例（KV 会在运行时从环境变量获取）
 function getDB(context) {
@@ -27,8 +26,6 @@ function getDB(context) {
     links: new LinkDB(kv),
     questionnaires: new QuestionnaireDB(kv),
     notifications: new NotificationDB(kv),
-    orders: new OrderDB(kv),
-    sessions: new SessionDB(kv),
   }
 }
 
@@ -46,8 +43,6 @@ function getInMemoryDB() {
     links: new LinkDB(mockKV),
     questionnaires: new QuestionnaireDB(mockKV),
     notifications: new NotificationDB(mockKV),
-    orders: new OrderDB(mockKV),
-    sessions: new SessionDB(mockKV),
   }
 }
 
@@ -58,12 +53,7 @@ export async function onRequest(context) {
   const { request, env, params } = context
   const { path } = params || {}
   const url = new URL(request.url)
-  const normalizedPath = Array.isArray(path)
-    ? path.join('/')
-    : typeof path === 'string'
-      ? path
-      : ''
-  const pathSegments = normalizedPath.split('/').filter(Boolean)
+  const pathSegments = (path || '').split('/').filter(Boolean)
   const method = request.method
 
   const db = getDB(context)
@@ -112,18 +102,10 @@ async function routeHandler(pathSegments, method, request, db, env) {
     return handleAvailableQuestionnaires(db)
   }
 
-  // 支付通知路由（不需要认证，由支付网关调用）
-  if (resource === 'payment' && action === 'notify' && method === 'POST') {
-    return handlePaymentRoutes(action, rest, method, request, db, null, request.url)
-  }
-
-  // 其他路由需要认证（但支付创建和查询允许未登录用户）
-  let authResult = { valid: true, userId: null, userRole: null }
-  if (resource !== 'payment' || (action !== 'create' && action !== 'query')) {
-    authResult = await verifyAuth(request, env, db)
-    if (!authResult.valid) {
-      return authResult.error
-    }
+  // 其他路由需要认证
+  const authResult = await verifyAuth(request, env)
+  if (!authResult.valid) {
+    return authResult.error
   }
 
   const userId = authResult.userId
@@ -155,9 +137,6 @@ async function routeHandler(pathSegments, method, request, db, env) {
     case 'notifications':
       return handleNotificationRoutes(action, rest, method, request, db, userId)
     
-    case 'payment':
-      return handlePaymentRoutes(action, rest, method, request, db, userId, request.url)
-    
     default:
       return notFoundResponse('API 路由不存在')
   }
@@ -180,12 +159,6 @@ async function handleAuthRoutes(action, method, request, db, env, userId = null)
   }
   
   if (action === 'logout' && method === 'POST') {
-    // 获取当前用户的token和会话信息
-    const authResult = await verifyAuth(request, env, db)
-    if (authResult.valid && authResult.sessionId) {
-      // 删除会话
-      await db.sessions.deleteSession(authResult.sessionId)
-    }
     return successResponse(null, '登出成功')
   }
   
@@ -225,49 +198,21 @@ async function handleLogin(request, db, env) {
     return errorResponse('该账号尚未通过管理员审核或已被禁用，请联系管理员', 403)
   }
 
-  // 检查是否已有活跃会话（单设备登录控制）
-  const existingSession = await db.sessions.getUserActiveSession(user.id)
-  if (existingSession) {
-    // 删除旧会话，强制旧设备下线
-    await db.sessions.deleteSession(existingSession.id)
-  }
-
   // 生成 Token
-  const expiresIn = 7 * 24 * 60 * 60 // 7天
-  const exp = Math.floor(Date.now() / 1000) + expiresIn
   const token = generateToken({
     userId: user.id,
     username: user.username,
     role: user.role,
-    exp,
+    exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7天过期
   }, env)
-
-  // 创建新会话
-  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
-  const session = await db.sessions.createSession(user.id, token, expiresAt)
-
-  // 在token payload中包含sessionId（用于后续验证）
-  // 注意：由于token已经生成，我们需要重新生成包含sessionId的token
-  const tokenWithSession = generateToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-    sessionId: session.id,
-    exp,
-  }, env)
-
-  // 更新会话中的token
-  const updatedSession = { ...session, token: tokenWithSession }
-  await db.sessions.kv.put(`session:${session.id}`, JSON.stringify(updatedSession))
 
   // 返回用户信息（不包含密码）
   const { password: _, ...userWithoutPassword } = user
 
   return successResponse({
-    token: tokenWithSession,
+    token,
     user: userWithoutPassword,
-    expiresIn,
-    sessionId: session.id,
+    expiresIn: 7 * 24 * 60 * 60,
   })
 }
 
@@ -328,7 +273,7 @@ async function handleGetCurrentUser(userId, db) {
  * 刷新 Token
  */
 async function handleRefreshToken(request, db, env) {
-  const authResult = await verifyAuth(request, env, db)
+  const authResult = await verifyAuth(request, env)
   if (!authResult.valid) {
     return authResult.error
   }
@@ -338,54 +283,14 @@ async function handleRefreshToken(request, db, env) {
     return errorResponse('用户不存在', 404)
   }
 
-  // 如果会话存在，更新token并保持会话
-  let sessionId = authResult.sessionId
-  if (sessionId) {
-    const session = await db.sessions.getSession(sessionId)
-    if (session) {
-      const expiresIn = 7 * 24 * 60 * 60
-      const exp = Math.floor(Date.now() / 1000) + expiresIn
-      const token = generateToken({
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        sessionId: session.id,
-        exp,
-      }, env)
-
-      // 更新会话中的token
-      const updatedSession = { ...session, token, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() }
-      await db.sessions.kv.put(`session:${session.id}`, JSON.stringify(updatedSession))
-
-      return successResponse({ token })
-    }
-  }
-
-  // 如果没有会话，创建新会话
-  const expiresIn = 7 * 24 * 60 * 60
-  const exp = Math.floor(Date.now() / 1000) + expiresIn
   const token = generateToken({
     userId: user.id,
     username: user.username,
     role: user.role,
-    exp,
+    exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
   }, env)
 
-  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
-  const session = await db.sessions.createSession(user.id, token, expiresAt)
-
-  const tokenWithSession = generateToken({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-    sessionId: session.id,
-    exp,
-  }, env)
-
-  const updatedSession2 = { ...session, token: tokenWithSession }
-  await db.sessions.kv.put(`session:${session.id}`, JSON.stringify(updatedSession2))
-
-  return successResponse({ token: tokenWithSession })
+  return successResponse({ token })
 }
 
 /**
@@ -1066,149 +971,6 @@ async function handleNotificationRoutes(action, rest, method, request, db, userI
   }
 
   return notFoundResponse('通知路由不存在')
-}
-
-/**
- * 支付路由处理
- */
-async function handlePaymentRoutes(action, rest, method, request, db, userId, requestUrl) {
-  const baseUrl = new URL(requestUrl).origin
-
-  // 创建支付订单（不需要认证，因为可能从首页直接支付）
-  if (action === 'create' && method === 'POST') {
-    const body = await request.json()
-    const { questionnaireType, money = 1, type = 'alipay' } = body
-
-    if (!questionnaireType) {
-      return errorResponse('问卷类型不能为空', 400)
-    }
-
-    // 生成订单号
-    const outTradeNo = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-
-    // 获取问卷信息
-    const questionnaire = await db.questionnaires.getQuestionnaire(questionnaireType)
-    const name = questionnaire ? questionnaire.title : `${questionnaireType} 心理健康测评`
-
-    // 创建订单
-    const order = await db.orders.createOrder({
-      outTradeNo,
-      questionnaireType,
-      money: money.toString(),
-      name,
-      type,
-      status: 'pending',
-      userId: userId || null, // 允许未登录用户创建订单
-    })
-
-    // 生成支付URL
-    const paymentRequest = generatePaymentUrl({
-      money: money.toString(),
-      name,
-      out_trade_no: outTradeNo,
-      notify_url: `${baseUrl}/api/payment/notify`,
-      return_url: `${baseUrl}/payment?result=return&qt=${encodeURIComponent(questionnaireType)}&order=${outTradeNo}`,
-      type,
-      param: questionnaireType,
-    })
-
-    return successResponse({
-      orderId: order.id,
-      outTradeNo: order.outTradeNo,
-      paymentUrl: paymentRequest.url,
-      paymentSign: paymentRequest.sign,
-      paymentParams: paymentRequest.params,
-      order,
-    })
-  }
-
-  // 支付异步通知（不需要认证，由支付网关调用）
-  if (action === 'notify' && method === 'POST') {
-    // 获取POST数据（可能是form-data或JSON）
-    let params = {}
-    const contentType = request.headers.get('content-type') || ''
-    
-    if (contentType.includes('application/json')) {
-      params = await request.json()
-    } else {
-      // 处理form-data或URL编码
-      const formData = await request.formData()
-      for (const [key, value] of formData.entries()) {
-        params[key] = value
-      }
-    }
-
-    // 验证签名
-    if (!verifySign(params)) {
-      console.error('支付通知签名验证失败', params)
-      return errorResponse('签名验证失败', 400)
-    }
-
-    const { out_trade_no, trade_no, trade_status, money } = params
-
-    // 查找订单
-    const order = await db.orders.getOrderByOutTradeNo(out_trade_no)
-    if (!order) {
-      console.error('订单不存在', out_trade_no)
-      return errorResponse('订单不存在', 404)
-    }
-
-    // 更新订单状态
-    if (trade_status === 'TRADE_SUCCESS' || trade_status === 'success') {
-      await db.orders.updateOrder(order.id, {
-        status: 'paid',
-        tradeNo: trade_no,
-        paidAt: new Date().toISOString(),
-      })
-
-      // 如果订单有用户ID，增加用户额度
-      if (order.userId) {
-        const user = await db.users.getUserById(order.userId)
-        if (user) {
-          // 根据金额增加额度（1元=1个额度，可以根据实际需求调整）
-          const quota = parseInt(money) || 1
-          await db.users.updateUser(order.userId, {
-            remainingQuota: (user.remainingQuota || 0) + quota,
-          })
-        }
-      }
-    } else if (trade_status === 'TRADE_FAILED' || trade_status === 'failed') {
-      await db.orders.updateOrder(order.id, {
-        status: 'failed',
-        tradeNo: trade_no,
-      })
-    }
-
-    // 返回成功（支付网关要求）
-    return new Response('success', {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    })
-  }
-
-  // 查询订单状态
-  if (action === 'query' && method === 'GET') {
-    const url = new URL(requestUrl)
-    const outTradeNo = url.searchParams.get('out_trade_no')
-
-    if (!outTradeNo) {
-      return errorResponse('订单号不能为空', 400)
-    }
-
-    const order = await db.orders.getOrderByOutTradeNo(outTradeNo)
-    if (!order) {
-      return notFoundResponse('订单不存在')
-    }
-
-    // 检查权限（如果是已登录用户，只能查看自己的订单）
-    if (userId && order.userId && order.userId !== userId) {
-      return unauthorizedResponse('无权查看该订单')
-    }
-
-    return successResponse(order)
-  }
-
-  return notFoundResponse('支付路由不存在')
 }
 
 

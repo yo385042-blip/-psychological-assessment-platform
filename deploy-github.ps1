@@ -1,85 +1,58 @@
-# GitHub Deployment Script
-# Push code to GitHub and trigger Cloudflare Pages auto-deployment
+param(
+  [string]$Branch = "main"
+)
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  GitHub Deployment Script" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host "=== GitHub deploy script ===" -ForegroundColor Cyan
 
-# Check if in git repository
-if (-not (Test-Path ".git")) {
-    Write-Host "Error: Not a git repository. Please initialize git first:" -ForegroundColor Red
-    Write-Host "  git init" -ForegroundColor Yellow
-    Write-Host "  git remote add origin <your-repo-url>" -ForegroundColor Yellow
-    exit 1
-}
+# Ensure we are in the script directory (project root)
+Set-Location -Path (Split-Path -Parent $MyInvocation.MyCommand.Path)
 
-# Check git status
-Write-Host "Checking git status..." -ForegroundColor Yellow
+Write-Host "Current directory: $(Get-Location)"
+
+# Show status
 $status = git status --porcelain
+if (-not $?) {
+  Write-Error "git status failed. Please check that git is installed and this is a git repo."
+  exit 1
+}
 
 if ($status) {
-    Write-Host ""
-    Write-Host "Uncommitted changes found:" -ForegroundColor Yellow
-    git status --short
-    
-    Write-Host ""
-    $addAll = Read-Host "Add all changes? (Y/N)"
-    if ($addAll -eq "Y" -or $addAll -eq "y") {
-        git add .
-        Write-Host "Changes added." -ForegroundColor Green
-    } else {
-        Write-Host "Please commit changes manually first." -ForegroundColor Yellow
-        exit 1
+  Write-Host "Uncommitted changes found:" -ForegroundColor Yellow
+  Write-Host $status
+
+  $answer = Read-Host "Add all changes? (Y/N)"
+  if ($answer -match '^(Y|y)$') {
+    git add .
+    if (-not $?) {
+      Write-Error "git add failed."
+      exit 1
     }
-    
-    Write-Host ""
-    $message = Read-Host "Enter commit message (or press Enter for default)"
-    if (-not $message) {
-        $message = "Update: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+
+    $msg = Read-Host "Enter commit message (or press Enter for default)"
+    if ([string]::IsNullOrWhiteSpace($msg)) {
+      $msg = "auto deploy"
     }
-    
-    git commit -m $message
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Commit failed." -ForegroundColor Red
-        exit 1
+
+    git commit -m "$msg"
+    if (-not $?) {
+      Write-Error "git commit failed."
+      exit 1
     }
-    
-    Write-Host "Changes committed." -ForegroundColor Green
+  } else {
+    Write-Host "Please commit your changes manually, then re-run this script."
+    exit 0
+  }
 } else {
-    Write-Host "No uncommitted changes." -ForegroundColor Green
+  Write-Host "No uncommitted changes." -ForegroundColor Green
 }
 
-# Check current branch
-$currentBranch = git branch --show-current
-Write-Host ""
-Write-Host "Current branch: $currentBranch" -ForegroundColor Cyan
-
-# Push to GitHub
-Write-Host ""
-Write-Host "Pushing to GitHub..." -ForegroundColor Yellow
-git push origin $currentBranch
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host "  OK Code pushed to GitHub successfully!" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "Cloudflare Pages will automatically detect the changes and deploy." -ForegroundColor Cyan
-    Write-Host "Check deployment status in Cloudflare Dashboard." -ForegroundColor Cyan
-} else {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host "  X Failed to push to GitHub" -ForegroundColor Red
-    Write-Host "========================================" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Please check:" -ForegroundColor Yellow
-    Write-Host "  1. GitHub remote is configured correctly" -ForegroundColor Yellow
-    Write-Host "  2. You have push permissions" -ForegroundColor Yellow
-    Write-Host "  3. Network connection is stable" -ForegroundColor Yellow
-    exit 1
+Write-Host "Pushing to GitHub (branch: $Branch)..." -ForegroundColor Cyan
+git push origin $Branch
+if (-not $?) {
+  Write-Error "git push failed. Please check your network or GitHub settings."
+  exit 1
 }
+
+Write-Host "Push completed. Cloudflare Pages (GitHub) will build and deploy automatically." -ForegroundColor Green
 
 

@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Link as LinkIcon,
@@ -13,92 +12,34 @@ import {
   Database,
   BarChart3,
   Download,
-  ChevronUp,
-  ChevronDown,
-  Archive,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '@/contexts/AuthContext'
 
-interface NavItem {
-  path?: string
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  roles?: Array<'admin' | 'user'>
-  subItems?: Array<{
-    path: string
-    icon: React.ComponentType<{ className?: string }>
-    label: string
-  }>
-}
-
-const navItems: NavItem[] = [
+const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: '仪表盘' },
   { path: '/links/generate', icon: LinkIcon, label: '生成链接' },
   { path: '/links/manage', icon: LinkIcon, label: '链接管理' },
   { path: '/statistics', icon: BarChart3, label: '统计分析' },
   { path: '/packages', icon: ShoppingCart, label: '购买套餐' },
   { path: '/notifications', icon: Bell, label: '通知中心' },
-  { path: '/admin/users', icon: Users, label: '用户管理', roles: ['admin'] },
-  {
-    icon: Database,
-    label: '题目管理',
-    roles: ['admin'],
-    subItems: [
-      { path: '/admin/questions/import', icon: UploadCloud, label: '题目导入' },
-      { path: '/links/batch-import', icon: UploadCloud, label: '批量导入' },
-      { path: '/admin/questions/manage', icon: Database, label: '管理器题目管理' },
-      { path: '/admin/questionnaires/manage', icon: FileText, label: '主页题目管理' },
-    ],
-  },
-  {
-    icon: Archive,
-    label: '数据管理',
-    roles: ['admin'],
-    subItems: [
-      { path: '/admin/reports', icon: FileText, label: '报告管理' },
-      { path: '/admin/export-history', icon: Download, label: '导出历史' },
-      { path: '/admin/audit', icon: FileText, label: '操作日志' },
-      { path: '/admin/backup', icon: Database, label: '数据备份' },
-    ],
-  },
+  { path: '/admin/questions/import', icon: UploadCloud, label: '题目导入', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/links/batch-import', icon: UploadCloud, label: '批量导入', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/questions/manage', icon: Database, label: '题目管理', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/users', icon: Users, label: '用户管理', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/reports', icon: FileText, label: '报告管理', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/export-history', icon: Download, label: '导出历史', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/audit', icon: FileText, label: '操作日志', roles: ['admin'] as Array<'admin' | 'user'> },
+  { path: '/admin/backup', icon: Database, label: '数据备份', roles: ['admin'] as Array<'admin' | 'user'> },
 ]
 
-interface SidebarProps {
-  onClose?: () => void
-}
-
-export default function Sidebar({ onClose }: SidebarProps) {
+export default function Sidebar() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { user, logout } = useAuth()
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['题目管理', '数据管理']))
 
   const handleLogout = () => {
     logout()
     navigate('/login')
-  }
-
-  const handleNavClick = () => {
-    // 在移动端点击导航项时关闭侧边栏
-    if (onClose) {
-      onClose()
-    }
-  }
-
-  const toggleGroup = (label: string) => {
-    const newExpanded = new Set(expandedGroups)
-    if (newExpanded.has(label)) {
-      newExpanded.delete(label)
-    } else {
-      newExpanded.add(label)
-    }
-    setExpandedGroups(newExpanded)
-  }
-
-  const isSubItemActive = (subItems?: NavItem['subItems']) => {
-    if (!subItems) return false
-    return subItems.some(item => location.pathname === item.path)
   }
 
   return (
@@ -146,90 +87,30 @@ export default function Sidebar({ onClose }: SidebarProps) {
             return item.roles.includes(user.role)
           })
           .map((item) => {
-            const Icon = item.icon
-            
-            // 如果是分组菜单（有子项）
-            if (item.subItems) {
-              const isExpanded = expandedGroups.has(item.label)
-              const hasActiveSubItem = isSubItemActive(item.subItems)
-              
-              return (
-                <div key={item.label} className="mb-2">
-                  <button
-                    onClick={() => toggleGroup(item.label)}
-                    className={clsx(
-                      'w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all',
-                      hasActiveSubItem
-                        ? 'bg-white/20 text-white'
-                        : 'text-white/80 hover:bg-white/10'
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-5 h-5" />
-                      <span>{item.label}</span>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4" />
-                    )}
-                  </button>
-                  
-                  {isExpanded && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {item.subItems.map((subItem) => {
-                        const SubIcon = subItem.icon
-                        return (
-                          <NavLink
-                            key={subItem.path}
-                            to={subItem.path}
-                            onClick={handleNavClick}
-                            className={({ isActive }) =>
-                              clsx(
-                                'flex items-center gap-3 px-4 py-2 rounded-lg transition-all text-sm',
-                                isActive
-                                  ? 'bg-white text-primary-600 font-semibold'
-                                  : 'text-white/70 hover:bg-white/10'
-                              )
-                            }
-                          >
-                            <SubIcon className="w-4 h-4" />
-                            <span>{subItem.label}</span>
-                          </NavLink>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-            
-            // 普通菜单项
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path!}
-                onClick={handleNavClick}
-                className={({ isActive }) =>
-                  clsx(
-                    'flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all',
-                    isActive
-                      ? 'bg-white text-primary-600 font-semibold shadow-lg'
-                      : 'text-white/80 hover:bg-white/10'
-                  )
-                }
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </NavLink>
-            )
-          })}
+          const Icon = item.icon
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all',
+                  isActive
+                    ? 'bg-white text-primary-600 font-semibold shadow-lg'
+                    : 'text-white/80 hover:bg-white/10'
+                )
+              }
+            >
+              <Icon className="w-5 h-5" />
+              <span>{item.label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
 
       <div className="p-4 border-t border-white/10">
         <NavLink
           to="/profile"
-          onClick={handleNavClick}
           className={({ isActive }) =>
             clsx(
               'flex items-center gap-3 px-4 py-3 rounded-xl mb-2 transition-all',

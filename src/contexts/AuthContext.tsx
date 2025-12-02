@@ -18,11 +18,9 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>
   register: (payload: RegisterPayload) => Promise<RegisterResult>
   accounts: StoredAccount[]
-  accountsLoading: boolean
-  fetchAccounts: () => void
-  clearCustomUsers: () => Promise<{ success: boolean; message?: string }>
-  updateUserStatus: (id: string, status: 'active' | 'disabled') => Promise<{ success: boolean; message?: string }>
-  updateUserQuota: (id: string, amount: number) => Promise<{ success: boolean; message?: string }>
+  clearCustomUsers: () => void
+  updateUserStatus: (id: string, status: 'active' | 'disabled') => void
+  updateUserQuota: (id: string, amount: number) => void // 添加额度（可以是正数或负数）
   updateUserUsedQuota: (id: string, amount: number) => void // 更新使用额度（生成链接时调用）
   logout: () => void
   isLoading: boolean
@@ -36,7 +34,7 @@ interface StoredAccount {
   role: 'admin' | 'user'
   name: string
   createdAt: string
-  status: 'active' | 'disabled' | 'pending'
+  status: 'active' | 'disabled'
   isDefault?: boolean
   remainingQuota: number
   lastLoginAt?: string // 最近一次在线日期
@@ -80,7 +78,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [accountsLoading, setAccountsLoading] = useState(false)
   const [customUsers, setCustomUsers] = useState<StoredAccount[]>([])
   const [defaultLoginTimesVersion, setDefaultLoginTimesVersion] = useState(0) // 用于触发默认账号登录时间更新
 
@@ -206,33 +203,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
   }
 
-  const updateUserStatus = async (id: string, status: 'active' | 'disabled'): Promise<{ success: boolean; message?: string }> => {
-    try {
-      setCustomUsers(prev => {
-        const updated = prev.map((account) =>
-          account.id === id ? { ...account, status } : account,
-        )
-        persistCustomUsers(updated)
-        return updated
-      })
-      return { success: true, message: '用户状态已更新' }
-    } catch (error) {
-      return { success: false, message: '更新失败，请稍后重试' }
-    }
+  const updateUserStatus = (id: string, status: 'active' | 'disabled') => {
+    setCustomUsers(prev => {
+      const updated = prev.map((account) =>
+        account.id === id ? { ...account, status } : account,
+      )
+      persistCustomUsers(updated)
+      return updated
+    })
   }
 
-  const updateUserQuota = async (id: string, amount: number): Promise<{ success: boolean; message?: string }> => {
-    try {
-      // 查找账号
-      const account = accounts.find(acc => acc.id === id)
-      if (!account) {
-        return { success: false, message: '用户不存在' }
-      }
+  const updateUserQuota = (id: string, amount: number) => {
+    // 查找账号
+    const account = accounts.find(acc => acc.id === id)
+    if (!account) return
 
-      // 管理员账号额度为无限，不允许修改
-      if (account.role === 'admin') {
-        return { success: false, message: '管理员账号额度不可修改' }
-      }
+    // 管理员账号额度为无限，不允许修改
+    if (account.role === 'admin') {
+      return
+    }
 
     const currentQuota = account.remainingQuota || 0
     const newQuota = Math.max(0, currentQuota + amount) // 确保不小于0
@@ -287,11 +276,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...user,
         remainingQuota: newQuota,
       }))
-    }
-    
-    return { success: true, message: '额度已更新' }
-    } catch (error) {
-      return { success: false, message: '更新失败，请稍后重试' }
     }
   }
 
@@ -358,21 +342,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const clearCustomUsers = async (): Promise<{ success: boolean; message?: string }> => {
-    try {
-      setCustomUsers([])
-      persistCustomUsers([])
-      return { success: true, message: '已清空注册用户数据' }
-    } catch (error) {
-      return { success: false, message: '操作失败，请稍后重试' }
-    }
-  }
-
-  const fetchAccounts = () => {
-    setAccountsLoading(true)
-    // 触发 accounts 重新计算
-    setDefaultLoginTimesVersion(prev => prev + 1)
-    setAccountsLoading(false)
+  const clearCustomUsers = () => {
+    setCustomUsers([])
+    persistCustomUsers([])
   }
 
   const login = async (
@@ -508,8 +480,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         accounts,
-        accountsLoading,
-        fetchAccounts,
         clearCustomUsers,
         updateUserStatus,
         updateUserQuota,
