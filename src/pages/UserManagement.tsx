@@ -6,7 +6,7 @@ import { formatDate, formatNumber, formatCurrency } from '@/utils/formatters'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useInputDialog } from '@/components/InputDialog'
 
-const statusStyles: Record<'active' | 'disabled' | 'pending', string> = {
+const statusStyles: Record<string, string> = {
   active: 'bg-successLight text-success border border-success/30',
   disabled: 'bg-dangerLight text-danger border-danger/30',
   pending: 'bg-warningLight text-warning border border-warning/30',
@@ -37,7 +37,7 @@ export default function UserManagement() {
   const customAccounts = useMemo(() => accounts.filter((acc) => acc.role !== 'admin'), [accounts])
   const adminAccounts = useMemo(() => accounts.filter((acc) => acc.role === 'admin'), [accounts])
 
-  const handleToggleStatus = async (accountId: string, currentStatus: 'active' | 'disabled') => {
+  const handleToggleStatus = async (accountId: string, currentStatus: 'active' | 'disabled' | 'pending') => {
     const nextStatus = currentStatus === 'active' ? 'disabled' : 'active'
     const confirmed = await showConfirm(
       '确认操作',
@@ -46,7 +46,7 @@ export default function UserManagement() {
     if (!confirmed) {
       return
     }
-    const result = await updateUserStatus(accountId, nextStatus)
+    const result = await updateUserStatus(accountId, nextStatus as 'active' | 'disabled')
     await showAlert(
       result.success ? '操作成功' : '操作失败',
       result.message || (result.success ? '用户状态已更新' : '更新失败，请稍后重试'),
@@ -179,7 +179,7 @@ export default function UserManagement() {
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-1">{account.email}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[account.status || 'active']}`}>
-                  {account.status === 'active' ? '正常' : account.status === 'pending' ? '待审核' : '已禁用'}
+                  {account.status === 'active' ? '正常' : (account.status === 'pending' ? '待审核' : '已禁用')}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -214,7 +214,8 @@ export default function UserManagement() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleToggleStatus(account.id, account.status === 'active' ? 'active' : 'disabled')
+                      const currentStatus = account.status || 'active'
+                      handleToggleStatus(account.id, currentStatus)
                     }}
                     className={`flex items-center gap-1 text-xs ${
                       account.status === 'active'
@@ -297,9 +298,14 @@ export default function UserManagement() {
                     )}
                   </td>
                   <td className="py-2 sm:py-3 px-2 sm:px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[account.status || 'active']}`}>
-                      {account.status === 'active' ? '正常' : account.status === 'pending' ? '待审核' : '已禁用'}
-                    </span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[account.status || 'active']}`}>
+                  {(() => {
+                    const status = account.status || 'active'
+                    if (status === 'active') return '正常'
+                    if (status === 'pending') return '待审核'
+                    return '已禁用'
+                  })()}
+                </span>
                   </td>
                   <td className="py-2 sm:py-3 px-2 sm:px-4 text-gray-500 text-xs sm:text-sm hidden lg:table-cell">
                     {formatDate(account.createdAt, 'yyyy-MM-dd')}

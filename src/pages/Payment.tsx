@@ -1,223 +1,236 @@
-/**
- * 支付页面
- * 无需登录即可支付并开始测试
- */
-
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CreditCard, Lock, Loader } from 'lucide-react'
-import { getAllQuestionnaires, type QuestionnaireConfig } from '@/utils/questionnaireConfig'
-import { generateId } from '@/utils/formatters'
-import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { CreditCard, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react'
+import { apiClient } from '@/services/api/client'
+import toast from 'react-hot-toast'
 
 export default function Payment() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const questionnaireType = searchParams.get('type') || ''
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [orderStatus, setOrderStatus] = useState<'pending' | 'success' | 'failed' | null>(null)
+  const [orderInfo, setOrderInfo] = useState<any>(null)
+
+  const questionnaireType = searchParams.get('qt') || searchParams.get('type') || ''
   const result = searchParams.get('result')
   const orderNo = searchParams.get('order')
-  const { showAlert, DialogComponent } = useConfirmDialog()
-  
-  const [questionnaire, setQuestionnaire] = useState<QuestionnaireConfig | null>(null)
-  const [isPaying, setIsPaying] = useState(false)
-  const [paymentMethod] = useState<'alipay'>('alipay') // 仅支持支付宝
 
   useEffect(() => {
-    if (!questionnaireType) {
-      showAlert('错误', '请选择要测试的问卷类型', 'alert')
-      navigate('/')
-      return
+    // 如果是从支付网关返回，查询订单状态
+    if (result === 'return' && orderNo) {
+      checkOrderStatus(orderNo)
     }
+  }, [result, orderNo])
 
-    const configs = getAllQuestionnaires()
-    const found = configs.find(q => q.value === questionnaireType)
-    
-    if (!found) {
-      showAlert('错误', '未找到该问卷类型', 'alert')
-      navigate('/')
-      return
-    }
-
-    setQuestionnaire(found)
-  }, [questionnaireType, navigate, showAlert])
-
-  // 支付完成后从 return_url 返回时，根据订单状态跳转到测试页面
-  useEffect(() => {
-    const checkOrder = async () => {
-      if (result !== 'return' || !orderNo) return
-      try {
-        const resp = await fetch(`/api/payment/order-status?out_trade_no=${encodeURIComponent(orderNo)}`)
-        if (!resp.ok) {
-          throw new Error('查询订单失败')
-        }
-        const data = await resp.json()
-        if (data.code === 0 && data.data?.status === 'paid' && data.data.linkId) {
-          // 将已支付链接写入本地 paid_test_links，兼容现有 Test 页面逻辑
-          const paidLinks = JSON.parse(localStorage.getItem('paid_test_links') || '[]')
-          paidLinks.push({
-            id: data.data.linkId,
-            url: `${window.location.origin}/test/${data.data.linkId}`,
-            questionnaireType: data.data.questionnaireType,
-            paidAt: new Date().toISOString(),
-            price: questionnaire?.price ?? 0,
-            status: 'unused',
-          })
-          localStorage.setItem('paid_test_links', JSON.stringify(paidLinks))
-
-          navigate(`/test/${data.data.linkId}`, { replace: true })
-        }
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    checkOrder()
-  }, [result, orderNo, questionnaire?.price, navigate])
-
-  const handlePayment = async () => {
-    if (!questionnaire) return
-
-    setIsPaying(true)
- 
+  const checkOrderStatus = async (outTradeNo: string) => {
     try {
-      // 生成商户订单号（可根据需要改为后端生成）
-      const outTradeNo = generateId()
-
-      const baseUrl = window.location.origin
-      const notifyUrl = `${baseUrl}/api/payment/notify`
-      // 注意：return_url 中使用 qt 而不是 type，避免与支付参数 type 冲突
-      const returnUrl = `${baseUrl}/payment?result=return&qt=${encodeURIComponent(
-        questionnaire.value,
-      )}&order=${outTradeNo}`
-
-      const resp = await fetch('/api/payment/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: questionnaire.label,
-          money: String(questionnaire.price),
-          out_trade_no: outTradeNo,
-          notify_url: notifyUrl,
-          return_url: returnUrl,
-          type: paymentMethod,
-          param: questionnaire.value,
-        }),
-      })
-
-      if (!resp.ok) {
-        const errorText = await resp.text()
-        console.error('支付创建失败:', resp.status, errorText)
-        throw new Error(`创建支付订单失败 (${resp.status}): ${errorText}`)
-      }
-
-      const data = await resp.json()
-      console.log('支付接口返回:', data)
+      setLoading(true)
+      const response = await apiClient.get(`/payment/query?out_trade_no=${encodeURIComponent(outTradeNo)}`)
       
-      // 检查响应格式：后端使用 success 字段
-      if (!data.success) {
-        console.error('支付接口错误:', data)
-        throw new Error(data.message || '支付接口返回错误')
+      if (response.success && response.data) {
+        const order = response.data
+        setOrderInfo(order)
+        
+        if (order.status === 'paid') {
+          setOrderStatus('success')
+          toast.success('支付成功！')
+        } else if (order.status === 'failed') {
+          setOrderStatus('failed')
+          toast.error('支付失败')
+        } else {
+          setOrderStatus('pending')
+        }
+      } else {
+        setOrderStatus('failed')
+        toast.error('查询订单失败')
       }
-      
-      if (!data.data?.payUrl) {
-        console.error('支付接口返回数据异常:', data)
-        throw new Error(data.message || '支付网关返回异常：缺少支付链接')
-      }
-
-      // 跳转到易支付收银台
-      window.location.href = data.data.payUrl
-    } catch (error) {
-      console.error(error)
-      setIsPaying(false)
-      await showAlert('支付失败', error instanceof Error ? error.message : '支付过程中出现错误，请重试', 'alert')
+    } catch (error: any) {
+      console.error('查询订单失败:', error)
+      setOrderStatus('failed')
+      toast.error('查询订单失败')
+    } finally {
+      setLoading(false)
     }
   }
 
-  if (!questionnaire) {
+  const handlePayment = async (type: 'alipay' | 'wxpay' = 'alipay') => {
+    if (!questionnaireType) {
+      toast.error('请选择问卷类型')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await apiClient.post('/payment/create', {
+        questionnaireType,
+        money: 1,
+        type,
+      })
+
+      if (response.success && response.data?.paymentUrl) {
+        // 跳转到支付网关
+        window.location.href = response.data.paymentUrl
+      } else {
+        toast.error(response.message || '创建支付订单失败')
+        setLoading(false)
+      }
+    } catch (error: any) {
+      console.error('创建支付订单失败:', error)
+      toast.error(error.message || '创建支付订单失败')
+      setLoading(false)
+    }
+  }
+
+  // 支付成功页面
+  if (orderStatus === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-8 h-8 animate-spin text-primary-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
+          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">支付成功！</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            您的订单已支付成功，额度已到账
+          </p>
+          {orderInfo && (
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6 text-left">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">订单号：</span>
+                  <span className="text-gray-900 dark:text-white font-mono">{orderInfo.outTradeNo}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">支付金额：</span>
+                  <span className="text-gray-900 dark:text-white">¥{orderInfo.money}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">问卷类型：</span>
+                  <span className="text-gray-900 dark:text-white">{orderInfo.questionnaireType}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="w-full py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+          >
+            返回首页
+          </button>
+        </div>
       </div>
     )
   }
 
+  // 支付失败页面
+  if (orderStatus === 'failed') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">支付失败</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            支付未完成，请重试
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setOrderStatus(null)
+                setOrderInfo(null)
+              }}
+              className="flex-1 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              重新支付
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex-1 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 支付页面
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-      {DialogComponent}
-      
-      <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
-          {/* 标题 */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-500 rounded-2xl mb-4">
-              <CreditCard className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">支付测试费用</h1>
-            <p className="text-gray-600 dark:text-gray-400">完成支付后即可开始测试</p>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-background to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-6">
+          <CreditCard className="w-12 h-12 text-primary-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">支付订单</h2>
+          {questionnaireType && (
+            <p className="text-gray-600 dark:text-gray-400">
+              问卷类型：<span className="font-semibold">{questionnaireType}</span>
+            </p>
+          )}
+        </div>
 
-          {/* 问卷信息 */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4 mb-6">
-            <h2 className="font-semibold text-gray-900 dark:text-white mb-2">{questionnaire.label}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{questionnaire.description}</p>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                <span>{questionnaire.questions}</span>
-                <span className="mx-2">•</span>
-                <span>{questionnaire.duration}</span>
-              </div>
-              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                ¥{questionnaire.price}
-              </div>
+        {!questionnaireType && (
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800 dark:text-yellow-200">
+              <p className="font-medium mb-1">缺少问卷类型</p>
+              <p>请从首页选择问卷类型后进入支付页面</p>
             </div>
           </div>
+        )}
 
-          {/* 支付方式 */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              支付方式
-            </label>
-            <div className="p-4 rounded-xl border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/20">
-              <div className="text-center">
-                <div className="text-2xl mb-2">💙</div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">支付宝</div>
-              </div>
+        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-6">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 dark:text-gray-400">支付金额</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">¥1.00</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600 dark:text-gray-400">获得额度</span>
+              <span className="text-gray-900 dark:text-white">1 个测试链接</span>
             </div>
           </div>
+        </div>
 
-          {/* 安全提示 */}
-          <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-6">
-            <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800 dark:text-blue-300">
-              <p className="font-medium mb-1">安全支付</p>
-              <p className="text-xs">您的支付信息将被加密传输，确保安全</p>
-            </div>
-          </div>
-
-          {/* 支付按钮 */}
+        <div className="space-y-3">
           <button
-            onClick={handlePayment}
-            disabled={isPaying}
-            className="w-full bg-primary-500 text-white py-4 rounded-xl font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={() => handlePayment('alipay')}
+            disabled={loading || !questionnaireType}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isPaying ? (
+            {loading ? (
               <>
-                <Loader className="w-5 h-5 animate-spin" />
-                支付中...
+                <Loader2 className="w-5 h-5 animate-spin" />
+                处理中...
               </>
             ) : (
               <>
                 <CreditCard className="w-5 h-5" />
-                立即支付 ¥{questionnaire.price}
+                支付宝支付
               </>
             )}
           </button>
 
-          {/* 返回按钮 */}
+          <button
+            onClick={() => handlePayment('wxpay')}
+            disabled={loading || !questionnaireType}
+            className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                处理中...
+              </>
+            ) : (
+              <>
+                <CreditCard className="w-5 h-5" />
+                微信支付
+              </>
+            )}
+          </button>
+        </div>
+
+        <div className="mt-6 text-center">
           <button
             onClick={() => navigate('/')}
-            className="w-full mt-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 text-sm"
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
           >
             返回首页
           </button>
@@ -226,4 +239,3 @@ export default function Payment() {
     </div>
   )
 }
-

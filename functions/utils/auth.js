@@ -7,8 +7,11 @@ import { unauthorizedResponse } from './response.js'
 
 /**
  * 验证请求的认证状态
+ * @param {Request} request - 请求对象
+ * @param {Object} env - 环境变量
+ * @param {Object} db - 数据库实例（可选，用于会话验证）
  */
-export async function verifyAuth(request, env = {}) {
+export async function verifyAuth(request, env = {}, db = null) {
   const token = extractToken(request)
   if (!token) {
     return { valid: false, error: unauthorizedResponse('缺少认证 Token') }
@@ -19,14 +22,25 @@ export async function verifyAuth(request, env = {}) {
     return { valid: false, error: unauthorizedResponse('Token 无效或已过期') }
   }
 
-  return { valid: true, userId: payload.userId, userRole: payload.role }
+  // 如果提供了数据库实例，验证会话（单设备登录控制）
+  if (db && db.sessions && payload.sessionId) {
+    const isValid = await db.sessions.validateSession(payload.sessionId, token)
+    if (!isValid) {
+      return { valid: false, error: unauthorizedResponse('会话已失效，请重新登录') }
+    }
+  }
+
+  return { valid: true, userId: payload.userId, userRole: payload.role, sessionId: payload.sessionId }
 }
 
 /**
  * 检查是否为管理员
+ * @param {Request} request - 请求对象
+ * @param {Object} env - 环境变量
+ * @param {Object} db - 数据库实例（可选，用于会话验证）
  */
-export async function requireAdmin(request, env = {}) {
-  const authResult = await verifyAuth(request, env)
+export async function requireAdmin(request, env = {}, db = null) {
+  const authResult = await verifyAuth(request, env, db)
   if (!authResult.valid) {
     return authResult
   }
@@ -56,6 +70,7 @@ export function hashPassword(password) {
 export function verifyPassword(password, hashedPassword) {
   return hashPassword(password) === hashedPassword
 }
+
 
 
 

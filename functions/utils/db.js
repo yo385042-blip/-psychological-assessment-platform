@@ -420,3 +420,147 @@ export class OrderDB {
   }
 }
 
+/**
+ * 会话相关操作（用于单设备登录控制）
+ */
+export class SessionDB {
+  constructor(kv) {
+    this.kv = kv
+    this.sessionPrefix = 'session:'
+    this.userSessionPrefix = 'user:session:'
+    this.sessionIndexKey = 'sessions:index'
+  }
+
+  /**
+   * 获取会话信息
+   */
+  async getSession(sessionId) {
+    const data = await this.kv.get(`${this.sessionPrefix}${sessionId}`)
+    return data ? JSON.parse(data) : null
+  }
+
+  /**
+   * 获取用户的活跃会话
+   */
+  async getUserActiveSession(userId) {
+    const sessionId = await this.kv.get(`${this.userSessionPrefix}${userId}`)
+    if (!sessionId) return null
+    
+    const session = await this.getSession(sessionId)
+    if (!session) return null
+
+    // 检查会话是否过期
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      // 会话已过期，删除
+      await this.deleteSession(sessionId)
+      return null
+    }
+
+    return session
+  }
+
+  /**
+   * 创建新会话
+   */
+  async createSession(userId, token, expiresAt) {
+    const sessionId = generateId()
+    const now = new Date().toISOString()
+    
+    const session = {
+      id: sessionId,
+      userId,
+      token,
+      createdAt: now,
+      expiresAt: expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 默认7天
+      lastAccessAt: now,
+    }
+
+    // 存储会话
+    await this.kv.put(`${this.sessionPrefix}${sessionId}`, JSON.stringify(session))
+
+    // 存储用户到会话的映射（用于快速查找用户的活跃会话）
+    await this.kv.put(`${this.userSessionPrefix}${userId}`, sessionId)
+
+    // 添加到会话索引
+    const index = await this.kv.get(this.sessionIndexKey)
+    const sessionIds = index ? JSON.parse(index) : []
+    sessionIds.push(sessionId)
+    await this.kv.put(this.sessionIndexKey, JSON.stringify(sessionIds))
+
+    return session
+  }
+
+  /**
+   * 更新会话的最后访问时间
+   */
+  async updateSessionAccess(sessionId) {
+    const session = await this.getSession(sessionId)
+    if (!session) return null
+
+    session.lastAccessAt = new Date().toISOString()
+    await this.kv.put(`${this.sessionPrefix}${sessionId}`, JSON.stringify(session))
+    return session
+  }
+
+  /**
+   * 删除会话
+   */
+  async deleteSession(sessionId) {
+    const session = await this.getSession(sessionId)
+    if (!session) return false
+
+    // 删除会话
+    await this.kv.delete(`${this.sessionPrefix}${sessionId}`)
+
+    // 删除用户到会话的映射
+    if (session.userId) {
+      const userSessionId = await this.kv.get(`${this.userSessionPrefix}${session.userId}`)
+      if (userSessionId === sessionId) {
+        await this.kv.delete(`${this.userSessionPrefix}${session.userId}`)
+      }
+    }
+
+    // 从索引中删除
+    const index = await this.kv.get(this.sessionIndexKey)
+    if (index) {
+      const sessionIds = JSON.parse(index)
+      const filtered = sessionIds.filter(id => id !== sessionId)
+      await this.kv.put(this.sessionIndexKey, JSON.stringify(filtered))
+    }
+
+    return true
+  }
+
+  /**
+   * 删除用户的所有会话（用于强制下线）
+   */
+  async deleteUserSessions(userId) {
+    const sessionId = await this.kv.get(`${this.userSessionPrefix}${userId}`)
+    if (sessionId) {
+      await this.deleteSession(sessionId)
+    }
+    return true
+  }
+
+  /**
+   * 验证会话是否有效
+   */
+  async validateSession(sessionId, token) {
+    const session = await this.getSession(sessionId)
+    if (!session) return false
+
+    // 检查token是否匹配
+    if (session.token !== token) return false
+
+    // 检查是否过期
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      await this.deleteSession(sessionId)
+      return false
+    }
+
+    // 更新最后访问时间
+    await this.updateSessionAccess(sessionId)
+    return true
+  }
+}
+
