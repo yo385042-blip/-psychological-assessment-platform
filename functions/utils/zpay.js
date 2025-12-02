@@ -42,7 +42,16 @@ export function generateSign(params, key = MERCHANT_KEY) {
   }
 
   // 4. 进行 MD5 加密（标准实现，按 UTF-8 编码）
-  return md5(finalString)
+  const digest = md5(finalString)
+
+  // 打印当前计算出来的 MD5（不含密钥），方便和 zpay 后台在线验签工具对比
+  try {
+    console.log('ZPAY_MD5_FOR_CHECK:', digest)
+  } catch (e) {
+    // ignore
+  }
+
+  return digest
 }
 
 /**
